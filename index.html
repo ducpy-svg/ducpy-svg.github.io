@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="day" data-primary="ocean">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ocean EDU - Student management list (Unofficial) ver 1.3.7</title>
+  <link rel="icon" href="Token.png">
+  <link rel="stylesheet" href="styles.css">
+  <script>
+    try {
+      var saved = JSON.parse(localStorage.getItem('oceanEdu.v1') || '{}');
+      var theme = saved.settings && saved.settings.theme === 'night' ? 'night' : 'day';
+      var primaries = ['ocean', 'sky', 'teal', 'green', 'lime', 'amber', 'orange', 'coral', 'rose', 'violet', 'indigo', 'slate'];
+      var primary = saved.settings && primaries.indexOf(saved.settings.primary) >= 0 ? saved.settings.primary : 'ocean';
+      document.documentElement.setAttribute('data-theme', theme);
+      document.documentElement.setAttribute('data-primary', primary);
+    } catch (e) {}
+  </script>
+</head>
+<body>
+  <div class="decor" aria-hidden="true">
+    <span class="bubble b1"></span>
+    <span class="bubble b2"></span>
+    <span class="bubble b3"></span>
+    <span class="bubble b4"></span>
+    <span class="bubble b5"></span>
+    <span class="bubble b6"></span>
+    <span class="pfish f1"></span>
+    <span class="pfish f2"></span>
+    <span class="pfish f3"></span>
+    <div class="sea-bed">
+      <div class="wave3d">
+        <div class="wave-sheet sheet-a"></div>
+        <div class="wave-sheet sheet-b"></div>
+        <div class="wave-sheet sheet-c"></div>
+      </div>
+    </div>
+    <span class="boat"></span>
+  </div>
+
+  <div id="loader" class="loader hidden" role="status" aria-live="polite">
+    <div class="loader-card">
+      <div class="coin-stage">
+        <img src="Token.png" alt="" class="token-spin">
+      </div>
+      <p id="loader-title">Đang đo màn hình và đọc dữ liệu...</p>
+      <p id="loader-note" class="help"></p>
+    </div>
+  </div>
+
+  <div id="syncbox" class="syncbox hidden" role="status" aria-live="polite">
+    <img src="Token.png" alt="Đang ghi" class="sync-token">
+    <span id="sync-label"></span>
+  </div>
+  <div id="print-root"></div>
+
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+  <div id="clockbox" class="dialog hidden" role="dialog" aria-modal="true" aria-labelledby="clock-heading">
+    <div class="dialog-card" data-stop>
+      <div class="dialog-head">
+        <h2 id="clock-heading">Ngày giờ hệ thống</h2>
+        <button type="button" class="icon-x" data-act="close-clock" aria-label="Đóng">X</button>
+      </div>
+      <p class="clock-week" data-live="weekday">—</p>
+      <p class="clock-date" data-live="date">—</p>
+      <p class="clock-time" data-live="time-sec">—</p>
+      <p class="muted">Đồng hồ 12 giờ, A.M. và P.M., chạy theo thời gian thực của máy.</p>
+    </div>
+  </div>
+
+  <div id="settingsbox" class="dialog hidden" role="dialog" aria-modal="true" aria-labelledby="settings-heading">
+    <div class="dialog-card settings-card" data-stop>
+      <form id="settings-form">
+        <div class="dialog-head">
+          <h2 id="settings-heading">Cài đặt</h2>
+          <button type="button" class="icon-x" data-act="close-settings" aria-label="Đóng">X</button>
+        </div>
+        <p class="field-label">Màu giao diện</p>
+        <div class="theme-switch">
+          <button type="button" data-act="set-theme" data-theme="day" data-theme-btn>Ban ngày</button>
+          <button type="button" data-act="set-theme" data-theme="night" data-theme-btn>Ban đêm</button>
+        </div>
+        <p class="field-label">Màu chính</p>
+        <div class="primary-grid">
+          <button type="button" data-act="set-primary" data-primary="ocean" data-primary-btn style="--swatch:#0b8fd0">Đại dương</button>
+          <button type="button" data-act="set-primary" data-primary="sky" data-primary-btn style="--swatch:#0284c7">Xanh trời</button>
+          <button type="button" data-act="set-primary" data-primary="teal" data-primary-btn style="--swatch:#0f766e">Xanh ngọc</button>
+          <button type="button" data-act="set-primary" data-primary="green" data-primary-btn style="--swatch:#15803d">Xanh lá</button>
+          <button type="button" data-act="set-primary" data-primary="lime" data-primary-btn style="--swatch:#4d7c0f">Xanh cốm</button>
+          <button type="button" data-act="set-primary" data-primary="amber" data-primary-btn style="--swatch:#b45309">Hổ phách</button>
+          <button type="button" data-act="set-primary" data-primary="orange" data-primary-btn style="--swatch:#c2410c">Cam</button>
+          <button type="button" data-act="set-primary" data-primary="coral" data-primary-btn style="--swatch:#be123c">San hô</button>
+          <button type="button" data-act="set-primary" data-primary="rose" data-primary-btn style="--swatch:#be185d">Hồng</button>
+          <button type="button" data-act="set-primary" data-primary="violet" data-primary-btn style="--swatch:#7e22ce">Tím</button>
+          <button type="button" data-act="set-primary" data-primary="indigo" data-primary-btn style="--swatch:#4338ca">Chàm</button>
+          <button type="button" data-act="set-primary" data-primary="slate" data-primary-btn style="--swatch:#334155">Xám xanh</button>
+        </div>
+        <p class="help">12 màu chính cho nút, tiêu đề bảng và sóng. Ban ngày hoặc ban đêm giữ nền sáng hoặc tối.</p>
+        <label class="field">
+          <span>Tiêu đề</span>
+          <input id="setting-title" type="text" maxlength="120" required>
+        </label>
+        <div class="modal-foot">
+          <button type="submit" class="btn btn-primary">Lưu</button>
+          <button type="button" class="btn" data-act="close-settings">Đóng</button>
+        </div>
+      </form>
+      <div id="account-panel"></div>
+      <div id="script-panel"></div>
+    </div>
+  </div>
+
+  <div id="previewbox" class="hidden" role="dialog" aria-modal="true" aria-label="Xem ảnh">
+    <div class="preview-bar">
+      <button type="button" class="btn" data-act="preview-out" aria-label="Thu nhỏ">−</button>
+      <button type="button" class="btn" data-act="preview-in" aria-label="Phóng to">+</button>
+      <button type="button" class="btn" data-act="preview-close">Đóng</button>
+    </div>
+    <div class="preview-stage" id="preview-stage">
+      <img id="preview-img" alt="Xem ảnh" draggable="false">
+    </div>
+  </div>
+
+  <div id="app"></div>
+
+  <script src="xlsx.full.min.js"></script>
+  <script src="logic.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
