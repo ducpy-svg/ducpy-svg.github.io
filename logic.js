@@ -1037,9 +1037,62 @@
     return false;
   }
 
+  function sessionFetOf(cls, iso, start) {
+    var book = cls && cls.sessionFets;
+    var key = String(iso || '') + '|' + String(start || '');
+    if (book && typeof book === 'object' && !Array.isArray(book) && book[key]) return String(book[key]);
+    return String(cls && cls.fet || '');
+  }
+
+  function classFetNames(cls) {
+    var seen = {};
+    var out = [];
+    function add(value) {
+      String(value || '').split(',').forEach(function (part) {
+        var name = part.trim();
+        if (!name || name === '?' || name === '-' || seen[name]) return;
+        seen[name] = true;
+        out.push(name);
+      });
+    }
+    if (!cls) return out;
+    add(cls.fet);
+    var book = cls.sessionFets || {};
+    Object.keys(book).forEach(function (key) { add(book[key]); });
+    return out;
+  }
+
+  function classFetHit(cls, needle) {
+    if (!needle) return true;
+    if (staffHas(cls && cls.fet, needle)) return true;
+    var book = cls && cls.sessionFets;
+    if (!book || typeof book !== 'object') return false;
+    var keys = Object.keys(book);
+    for (var i = 0; i < keys.length; i++) {
+      if (staffHas(book[keys[i]], needle)) return true;
+    }
+    return false;
+  }
+
+  function countdownLabel(until, now) {
+    var end = until instanceof Date ? until : new Date(until);
+    var when = now instanceof Date ? now : new Date(now || Date.now());
+    if (isNaN(end.getTime())) return '';
+    var ms = end.getTime() - when.getTime();
+    if (ms < 0) ms = 0;
+    var total = Math.floor(ms / 1000);
+    var days = Math.floor(total / 86400);
+    total -= days * 86400;
+    var hours = Math.floor(total / 3600);
+    total -= hours * 3600;
+    var mins = Math.floor(total / 60);
+    var secs = total - mins * 60;
+    return days + ' ngày ' + hours + ' giờ ' + mins + ' phút ' + secs + ' giây';
+  }
+
   function passFilter(cls, filter) {
     if (!filter) return true;
-    if (filter.fet && !staffHas(cls.fet, filter.fet)) return false;
+    if (filter.fet && !classFetHit(cls, filter.fet)) return false;
     if (filter.cm && cls.cm !== filter.cm) return false;
     if (filter.ta && cls.ta !== filter.ta) return false;
     return true;
@@ -1138,7 +1191,7 @@
         id: cls.id,
         name: cls.kind === 'custom' ? currentName(cls) : ((level && level.name) || currentName(cls)),
         group: cls.kind === 'custom' ? 'CUSTOM' : (grade ? grade.track : 'CUSTOM'),
-        fet: cls.fet || '',
+        fet: sessionFetOf(cls, ses.iso, ses.start),
         cm: cls.cm || '',
         ta: cls.ta || '',
         iso: ses.iso,
@@ -1174,7 +1227,9 @@
           if (ses.endDate.getTime() <= born.getTime()) return;
           if (cls.completedAt && ses.date.getTime() > new Date(cls.completedAt).getTime()) return;
           if (skipped[ses.key]) return;
-          ensureRow(bandOf(slot.start), slot.start, slot.end).cells[Number(slot.dow)].push(chipFor(cls, ses, tags[ses.key], alerts[ses.key]));
+          var chip = chipFor(cls, ses, tags[ses.key], alerts[ses.key]);
+          if (filter && filter.fet && !staffHas(chip.fet, filter.fet)) return;
+          ensureRow(bandOf(slot.start), slot.start, slot.end).cells[Number(slot.dow)].push(chip);
         });
       }
       (cls.sessionChanges || []).forEach(function (change) {
@@ -1184,7 +1239,9 @@
         if (ses.date.getTime() < start.getTime() || ses.date.getTime() >= end.getTime()) return;
         if (ses.endDate.getTime() <= born.getTime()) return;
         if (cls.completedAt && ses.date.getTime() > new Date(cls.completedAt).getTime()) return;
-        ensureRow(bandOf(ses.start), ses.start, ses.end).cells[ses.dow].push(chipFor(cls, ses, 'Đổi', alerts[ses.key]));
+        var moved = chipFor(cls, ses, 'Đổi', alerts[ses.key]);
+        if (filter && filter.fet && !staffHas(moved.fet, filter.fet)) return;
+        ensureRow(bandOf(ses.start), ses.start, ses.end).cells[ses.dow].push(moved);
       });
     });
     (office || []).forEach(function (slot) {
@@ -1231,7 +1288,7 @@
   function weekStats(classes, weekStart, now, filter, office) {
     var filtered = (classes || []).filter(function (cls) { return passFilter(cls, filter); });
     var current = filtered.filter(function (cls) { return !cls.completed; });
-    var grid = buildSchedule(filtered, weekStart, now, null, office);
+    var grid = buildSchedule(filtered, weekStart, now, filter, office);
     var sessions = 0;
     var minutes = 0;
     BANDS.forEach(function (band) {
@@ -3182,8 +3239,9 @@
     if (!name || name === '?' || name === '-') return 0;
     var total = 0;
     (classes || []).forEach(function (cls) {
-      if (!cls || !staffHas(cls.fet, name)) return;
+      if (!cls) return;
       monthSessions(cls, key).forEach(function (ses) {
+        if (!staffHas(sessionFetOf(cls, ses.iso, ses.start), name)) return;
         total += Math.max(0, minutesOf(ses.end) - minutesOf(ses.start));
       });
     });
@@ -3337,6 +3395,9 @@
     revertRosterFill: revertRosterFill,
     matchSheetClass: matchSheetClass,
     sheetStudents: sheetStudents,
-    dobOrDash: dobOrDash
+    dobOrDash: dobOrDash,
+    sessionFetOf: sessionFetOf,
+    classFetNames: classFetNames,
+    countdownLabel: countdownLabel
   };
 });

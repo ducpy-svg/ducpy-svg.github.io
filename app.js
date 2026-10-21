@@ -2,9 +2,9 @@
   'use strict';
 
   var L = window.OceanLogic;
-  var APP_TITLE = 'Ocean EDU - Student management list (Unofficial) ver 1.3.7';
+  var APP_TITLE = 'Ocean EDU - Student management list (Unofficial) ver 1.3.8';
   var PRIMARY_IDS = ['ocean', 'sky', 'teal', 'green', 'lime', 'amber', 'orange', 'coral', 'rose', 'violet', 'indigo', 'slate'];
-  var SUGGEST_URL = 'https://script.google.com/macros/s/AKfycbyNFHdMszhrmqyfXDHSDi2ti51y5_Ib3kiXgA5cGzcPkWLboUJSnPYJ5xwikb9N-fLOkg/exec';
+  var SKIN_IDS = ['default', 'y2k', 'mcbling', 'indie', 'aero', 'minimal'];
   var STORAGE = 'oceanEdu.v1';
   var DATA_FILE = 'ocean-edu-data.json';
   var CLASS_FILE = 'ocean-edu-classes.json';
@@ -21,7 +21,9 @@
     archive: [],
     exams: [],
     staffBook: {},
-    soaSlots: []
+    soaSlots: [],
+    tasks: [],
+    activity: []
   };
 
   var ui = {
@@ -58,7 +60,13 @@
     examId: null,
     examWizard: null,
     examWeek: '',
-    staffMonth: ''
+    staffMonth: '',
+    mailMonth: '',
+    mailId: '',
+    missedAt: 0,
+    noticeMonth: '',
+    suggest: { type: 'transfer' },
+    rejectId: ''
   };
 
   var droppedArchive = [];
@@ -66,6 +74,10 @@
   var examsSeen = false;
   var staffBookSeen = false;
   var soaSeen = false;
+  var tasksSeen = false;
+  var activitySeen = false;
+  var toastQueue = [];
+  var toastPlaying = false;
   var SOA_TYPES = ['Interview', 'event', 'Lớp EB'];
 
   var loading = false;
@@ -137,10 +149,11 @@
         'Ocean EDU - Student management list (Unofficial) ver 1.3.3',
         'Ocean EDU - Student management list (Unofficial) ver 1.3.4',
         'Ocean EDU - Student management list (Unofficial) ver 1.3.5',
-        'Ocean EDU - Student management list (Unofficial) ver 1.3.6'
+        'Ocean EDU - Student management list (Unofficial) ver 1.3.6',
+        'Ocean EDU - Student management list (Unofficial) ver 1.3.7'
       ];
       if (!state.settings.title || legacyTitle.indexOf(state.settings.title) >= 0) state.settings.title = APP_TITLE;
-      state.settings.scriptUrl = SUGGEST_URL;
+      delete state.settings.scriptUrl;
       if (state.settings.theme !== 'night') state.settings.theme = 'day';
       if (PRIMARY_IDS.indexOf(state.settings.primary) < 0) state.settings.primary = 'ocean';
       state.classes = normalizeClasses(raw.classes);
@@ -163,6 +176,8 @@
         if (!acc.id) acc.id = L.uid();
         if (acc.role === 'guest') acc.password = '';
         else acc.password = acc.password == null ? '' : String(acc.password);
+        acc.appearance = normalizeAppearance(acc.appearance);
+        if (!acc.ack || typeof acc.ack !== 'object' || Array.isArray(acc.ack)) acc.ack = {};
       });
       state.accounts = state.accounts.filter(function (acc) { return acc && typeof acc === 'object' && acc.username; });
       if (!state.accounts.length) state.accounts = [defaultAccount()];
@@ -173,8 +188,12 @@
       staffBookSeen = !!(raw.staffBook && typeof raw.staffBook === 'object' && !Array.isArray(raw.staffBook));
       state.soaSlots = normalizeSoa(raw.soaSlots);
       soaSeen = Array.isArray(raw.soaSlots);
+      state.tasks = normalizeTasks(raw.tasks);
+      tasksSeen = Array.isArray(raw.tasks);
+      state.activity = normalizeActivity(raw.activity);
+      activitySeen = Array.isArray(raw.activity);
     } catch (err) {
-      state.settings = { theme: 'day', primary: 'ocean', title: APP_TITLE, scriptUrl: SUGGEST_URL };
+      state.settings = { theme: 'day', primary: 'ocean', title: APP_TITLE };
       state.classes = [];
       state.announcements = [];
       state.accounts = [defaultAccount()];
@@ -182,10 +201,14 @@
       state.exams = [];
       state.staffBook = {};
       state.soaSlots = [];
+      state.tasks = [];
+      state.activity = [];
       droppedArchive = [];
       examsSeen = false;
       staffBookSeen = false;
       soaSeen = false;
+      tasksSeen = false;
+      activitySeen = false;
     }
   }
 
@@ -207,6 +230,15 @@
           }).filter(function (slot) { return !isNaN(slot.dow) && slot.start && slot.end; })
         };
       }).sort(function (a, b) { return a.from.localeCompare(b.from); });
+      var fets = {};
+      if (cls.sessionFets && typeof cls.sessionFets === 'object' && !Array.isArray(cls.sessionFets)) {
+        Object.keys(cls.sessionFets).forEach(function (key) {
+          var name = String(cls.sessionFets[key] || '').trim();
+          if (!name || !/^\d{4}-\d{2}-\d{2}\|/.test(key)) return;
+          fets[key] = name;
+        });
+      }
+      cls.sessionFets = fets;
       if (cls.homeTrack !== 'TEENS') cls.homeTrack = '';
       if (cls.kind === 'custom') {
         cls.customName = String(cls.customName || '').trim();
@@ -349,6 +381,8 @@
   var shareExams = false;
   var shareStaff = false;
   var shareSoa = false;
+  var shareTasks = false;
+  var shareActivity = false;
 
   function shareStamp(file) {
     var iso = file && file.settings && file.settings.savedAt ? file.settings.savedAt : (file && file.savedAt);
@@ -375,6 +409,17 @@
       state.soaSlots = L.mergeById(state.soaSlots || [], file.soaSlots, newer);
       shareSoa = true;
     }
+    if (Array.isArray(file.tasks)) {
+      state.tasks = L.mergeById(state.tasks || [], file.tasks, newer);
+      shareTasks = true;
+    }
+    if (Array.isArray(file.activity)) {
+      state.activity = L.mergeById(state.activity || [], file.activity, newer);
+      shareActivity = true;
+    }
+    if (Array.isArray(file.accounts) && file.accounts.length) {
+      state.accounts = mergeAccounts(state.accounts, file.accounts, newer);
+    }
   }
 
   function sealShare() {
@@ -390,6 +435,14 @@
     if (shareSoa) {
       state.soaSlots = normalizeSoa(state.soaSlots);
       if (state.soaSlots.length) soaSeen = true;
+    }
+    if (shareTasks) {
+      state.tasks = normalizeTasks(state.tasks);
+      if (state.tasks.length) tasksSeen = true;
+    }
+    if (shareActivity) {
+      state.activity = normalizeActivity(state.activity);
+      if (state.activity.length) activitySeen = true;
     }
   }
 
@@ -617,6 +670,8 @@
     if (examsSeen || (state.exams && state.exams.length)) payload.exams = state.exams || [];
     if (staffBookSeen || staffBookHasData()) payload.staffBook = state.staffBook || {};
     if (soaSeen || (state.soaSlots && state.soaSlots.length)) payload.soaSlots = state.soaSlots || [];
+    if (tasksSeen || (state.tasks && state.tasks.length)) payload.tasks = state.tasks || [];
+    if (activitySeen || (state.activity && state.activity.length)) payload.activity = state.activity || [];
     return payload;
   }
 
@@ -630,6 +685,8 @@
     if (examsSeen || (state.exams && state.exams.length)) payload.exams = state.exams || [];
     if (staffBookSeen || staffBookHasData()) payload.staffBook = state.staffBook || {};
     if (soaSeen || (state.soaSlots && state.soaSlots.length)) payload.soaSlots = state.soaSlots || [];
+    if (tasksSeen || (state.tasks && state.tasks.length)) payload.tasks = state.tasks || [];
+    if (activitySeen || (state.activity && state.activity.length)) payload.activity = state.activity || [];
     return payload;
   }
 
@@ -764,7 +821,10 @@
     var classJson = JSON.stringify(state.classes);
     if (lastClassJson !== null && classJson !== lastClassJson) state.settings.classesSavedAt = new Date().toISOString();
     lastClassJson = classJson;
-    if (!(options && options.keepStamp) || !state.settings.savedAt) state.settings.savedAt = new Date().toISOString();
+    if (!(options && options.keepStamp) || !state.settings.savedAt) {
+      state.settings.savedAt = new Date().toISOString();
+      state.settings.rev = (Number(state.settings.rev) || 0) + 1;
+    }
     var dataJson = JSON.stringify(dataPayload());
     var classFileJson = JSON.stringify(classBookPayload());
     var snapshot = JSON.parse(dataJson);
@@ -808,7 +868,14 @@
 
   function defaultPerms(role) {
     var on = role === 'commenter';
-    return { exportClasses: on, exportHomework: on, suggest: on };
+    return {
+      suggest: on,
+      studentOps: false,
+      classOps: false,
+      scheduleOps: false,
+      staffFeed: on,
+      examOps: false
+    };
   }
 
   function currentAccount() {
@@ -820,20 +887,35 @@
   }
 
   function accountPerms(acc) {
-    if (!acc) return defaultPerms('guest');
-    if (acc.role === 'admin') return { exportClasses: true, exportHomework: true, suggest: true };
-    var base = defaultPerms(acc.role);
+    var base = defaultPerms(acc && acc.role === 'commenter' ? 'commenter' : 'guest');
+    if (!acc) return base;
+    if (acc.role === 'admin') {
+      return { suggest: true, studentOps: true, classOps: true, scheduleOps: true, staffFeed: true, examOps: true };
+    }
     var stored = acc.perms || {};
     return {
-      exportClasses: stored.exportClasses == null ? base.exportClasses : !!stored.exportClasses,
-      exportHomework: stored.exportHomework == null ? base.exportHomework : !!stored.exportHomework,
-      suggest: stored.suggest == null ? base.suggest : !!stored.suggest
+      suggest: stored.suggest == null ? base.suggest : !!stored.suggest,
+      studentOps: !!stored.studentOps,
+      classOps: !!stored.classOps,
+      scheduleOps: !!stored.scheduleOps,
+      staffFeed: stored.staffFeed == null ? base.staffFeed : !!stored.staffFeed,
+      examOps: !!stored.examOps
     };
   }
 
-  function canExportClasses() { return !!(currentAccount() && accountPerms(currentAccount()).exportClasses); }
-  function canExportHomework() { return !!(currentAccount() && accountPerms(currentAccount()).exportHomework); }
-  function canSuggest() { return !!(currentAccount() && accountPerms(currentAccount()).suggest); }
+  function hasPerm(key) {
+    var acc = currentAccount();
+    return !!(acc && accountPerms(acc)[key]);
+  }
+
+  function canExportClasses() { return canEdit(); }
+  function canExportHomework() { return canEdit(); }
+  function canSuggest() { return hasPerm('suggest'); }
+  function canStudentOps() { return hasPerm('studentOps'); }
+  function canClassOps() { return hasPerm('classOps'); }
+  function canScheduleOps() { return hasPerm('scheduleOps'); }
+  function canExamOps() { return hasPerm('examOps'); }
+  function canStaffFeed() { return hasPerm('staffFeed'); }
 
   function roleLabel(role) {
     if (role === 'admin') return 'ADMIN';
@@ -854,31 +936,54 @@
   function paintAppearance() {
     state.settings.theme = state.settings.theme === 'night' ? 'night' : 'day';
     state.settings.primary = primaryId(state.settings.primary);
-    document.documentElement.setAttribute('data-theme', state.settings.theme);
-    document.documentElement.setAttribute('data-primary', state.settings.primary);
+    applyAccountLook();
     paintThemeButtons();
   }
 
+  function rememberLook(patch) {
+    var acc = currentAccount();
+    if (!acc) return;
+    acc.appearance = normalizeAppearance(acc.appearance);
+    Object.keys(patch).forEach(function (key) { acc.appearance[key] = patch[key]; });
+    acc.appearance = normalizeAppearance(acc.appearance);
+  }
+
+  function applySkin(skin) {
+    if (!ui.user) { toast('Đăng nhập để giữ giao diện cho tài khoản này.'); return; }
+    rememberLook({ skin: SKIN_IDS.indexOf(skin) >= 0 ? skin : 'default' });
+    paintAppearance();
+    save();
+  }
+
   function applyTheme(theme) {
-    state.settings.theme = theme === 'night' ? 'night' : 'day';
+    if (skinOf(currentAccount()) !== 'default') return;
+    var next = theme === 'night' ? 'night' : 'day';
+    if (ui.user) rememberLook({ theme: next });
+    else state.settings.theme = next;
     paintAppearance();
     save();
   }
 
   function applyPrimary(id) {
-    state.settings.primary = primaryId(id);
+    if (skinOf(currentAccount()) !== 'default') return;
+    var next = primaryId(id);
+    if (ui.user) rememberLook({ primary: next });
+    else state.settings.primary = next;
     paintAppearance();
     save();
   }
 
   function paintThemeButtons() {
+    var acc = currentAccount();
+    var theme = acc && acc.appearance && acc.appearance.theme ? acc.appearance.theme : state.settings.theme;
+    var primary = acc && acc.appearance && PRIMARY_IDS.indexOf(acc.appearance.primary) >= 0 ? acc.appearance.primary : state.settings.primary;
     document.querySelectorAll('[data-theme-btn]').forEach(function (btn) {
-      var on = btn.getAttribute('data-theme') === state.settings.theme;
+      var on = btn.getAttribute('data-theme') === theme;
       btn.classList.toggle('is-on', on);
       btn.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
     document.querySelectorAll('[data-primary-btn]').forEach(function (btn) {
-      var on = btn.getAttribute('data-primary') === state.settings.primary;
+      var on = btn.getAttribute('data-primary') === primary;
       btn.classList.toggle('is-on', on);
       btn.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
@@ -913,14 +1018,516 @@
     var stamp = L.monthKey(now) + '-' + now.getDate();
     if (lastDay && stamp !== lastDay && ui.user && !busy()) render();
     lastDay = stamp;
+    paintGateClocks();
   }
 
-  function toast(message) {
+  function toast(message, ms) {
+    enqueueToast(message, ms || 4200);
+  }
+
+  function enqueueToast(message, ms) {
+    if (!message) return;
+    toastQueue.push({ message: message, ms: ms || 4200 });
+    playToast();
+  }
+
+  function playToast() {
+    if (toastPlaying || !toastQueue.length) return;
+    var item = toastQueue.shift();
     var el = document.getElementById('toast');
-    el.textContent = message;
+    if (!el) return;
+    toastPlaying = true;
+    el.textContent = item.message;
     el.classList.remove('hidden');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { el.classList.add('hidden'); }, 4200);
+    toastTimer = setTimeout(function () {
+      el.classList.add('hidden');
+      toastPlaying = false;
+      playToast();
+    }, item.ms);
+  }
+
+  function normalizeAppearance(raw) {
+    var look = raw && typeof raw === 'object' ? raw : {};
+    var skin = SKIN_IDS.indexOf(look.skin) >= 0 ? look.skin : 'default';
+    var theme = look.theme === 'night' ? 'night' : 'day';
+    var primary = PRIMARY_IDS.indexOf(look.primary) >= 0 ? look.primary : '';
+    return { skin: skin, theme: theme, primary: primary };
+  }
+
+  function normalizeTasks(list) {
+    return (Array.isArray(list) ? list : []).filter(function (item) {
+      return item && typeof item === 'object' && item.id && item.type;
+    }).map(function (item) {
+      var status = item.status === 'done' || item.status === 'rejected' ? item.status : 'open';
+      return {
+        id: String(item.id),
+        type: String(item.type),
+        status: status,
+        createdAt: item.createdAt || new Date().toISOString(),
+        updatedAt: item.updatedAt || item.createdAt || new Date().toISOString(),
+        actedAt: item.actedAt || '',
+        month: String(item.month || '').slice(0, 7),
+        fromUser: String(item.fromUser || ''),
+        fromName: String(item.fromName || ''),
+        toUser: String(item.toUser || ''),
+        toName: String(item.toName || ''),
+        summary: String(item.summary || ''),
+        reason: String(item.reason || ''),
+        rejectReason: String(item.rejectReason || ''),
+        studentId: String(item.studentId || ''),
+        studentName: String(item.studentName || ''),
+        fromClassId: String(item.fromClassId || ''),
+        fromClassName: String(item.fromClassName || ''),
+        toClassId: String(item.toClassId || ''),
+        toClassName: String(item.toClassName || ''),
+        draft: item.draft && typeof item.draft === 'object' ? {
+          name: String(item.draft.name || ''),
+          dob: String(item.draft.dob || ''),
+          englishName: String(item.draft.englishName || ''),
+          phone: String(item.draft.phone || ''),
+          ec: String(item.draft.ec || '')
+        } : null
+      };
+    });
+  }
+
+  function normalizeActivity(list) {
+    return (Array.isArray(list) ? list : []).filter(function (item) {
+      return item && item.id && item.text;
+    }).map(function (item) {
+      return {
+        id: String(item.id),
+        at: item.at || new Date().toISOString(),
+        actor: String(item.actor || ''),
+        text: String(item.text || ''),
+        aboutUser: String(item.aboutUser || '')
+      };
+    });
+  }
+
+  function mergeAccounts(local, incoming, newer) {
+    function keyOf(acc) { return String(acc && acc.username || '').trim(); }
+    var inc = {};
+    (incoming || []).forEach(function (acc) {
+      var key = keyOf(acc);
+      if (key) inc[key] = acc;
+    });
+    var seen = {};
+    var out = [];
+    (local || []).forEach(function (acc) {
+      var key = keyOf(acc);
+      if (!key || seen[key]) return;
+      seen[key] = true;
+      var other = inc[key];
+      if (newer && other) {
+        if (other.role !== 'guest' && !other.password && acc.password) other.password = acc.password;
+        if (!other.ack && acc.ack) other.ack = acc.ack;
+        out.push(other);
+      } else out.push(acc);
+    });
+    if (newer) {
+      (incoming || []).forEach(function (acc) {
+        var key = keyOf(acc);
+        if (!key || seen[key]) return;
+        seen[key] = true;
+        out.push(acc);
+      });
+    }
+    return out.filter(function (acc) { return acc && acc.username; });
+  }
+
+  function plainName(value) {
+    return String(value || '').split('(')[0].trim().toLowerCase().replace(/\s+/g, ' ');
+  }
+
+  function isCmOf(acc, cls) {
+    if (!acc || !cls || !cls.cm) return false;
+    var cm = plainName(cls.cm);
+    var name = plainName(acc.name);
+    return !!cm && cm === name;
+  }
+
+  function todayKey(now) {
+    return L.isoDay(now || new Date());
+  }
+
+  function taskTypeLabel(type) {
+    if (type === 'transfer') return 'Chuyển lớp';
+    if (type === 'add') return 'Thêm học viên';
+    if (type === 'other') return 'Khác';
+    return 'Đề xuất';
+  }
+
+  function logAction(detail, aboutUser) {
+    var name = ui.user ? ui.user.name : 'Nhân sự';
+    var text = 'Nhân sự ' + name + ' đã thực hiện ' + detail;
+    var item = {
+      id: L.uid(),
+      at: new Date().toISOString(),
+      actor: name,
+      text: text,
+      aboutUser: String(aboutUser || '')
+    };
+    if (!state.activity) state.activity = [];
+    state.activity.push(item);
+    if (state.activity.length > 200) state.activity.splice(0, state.activity.length - 200);
+    activitySeen = true;
+    var acc = currentAccount();
+    if (acc) acc.activitySeen = item.at;
+    if (canStaffFeed()) enqueueToast(text, 10000);
+  }
+
+  function playUnseenActivity() {
+    var acc = currentAccount();
+    if (!acc) return;
+    var seen = Date.parse(acc.activitySeen || '') || 0;
+    var fresh = (state.activity || []).filter(function (item) {
+      return item && Date.parse(item.at || '') > seen && item.actor !== acc.name;
+    });
+    var about = fresh.filter(function (item) { return item.aboutUser && item.aboutUser === acc.username; });
+    var feed = canStaffFeed() ? fresh.filter(function (item) { return item.aboutUser !== acc.username; }) : [];
+    about.concat(feed).slice(-6).forEach(function (item) { enqueueToast(item.text, 10000); });
+    if (fresh.length) acc.activitySeen = fresh[fresh.length - 1].at;
+  }
+
+  function accountByUsername(username) {
+    var key = String(username || '').trim();
+    for (var i = 0; i < state.accounts.length; i++) {
+      if (String(state.accounts[i].username || '').trim() === key) return state.accounts[i];
+    }
+    return null;
+  }
+
+  function suggestRecipients(type) {
+    return state.accounts.filter(function (acc) {
+      if (!acc || (ui.user && acc.username === ui.user.username)) return false;
+      var perms = accountPerms(acc);
+      if (type === 'other') return acc.role === 'admin' || perms.suggest;
+      return acc.role === 'admin' || perms.studentOps;
+    });
+  }
+
+  function popupItems(now) {
+    var acc = currentAccount();
+    if (!acc || !ui.user) return [];
+    var when = now || new Date();
+    var today = todayKey(when);
+    var items = [];
+    state.classes.forEach(function (cls) {
+      if (!isCmOf(acc, cls)) return;
+      var progress = L.progressOf(cls, when);
+      if (progress.end && !progress.open) {
+        var end = new Date(progress.end.getTime());
+        end.setHours(23, 59, 59, 999);
+        var lead = end.getTime() - when.getTime();
+        if (lead >= 0 && lead <= 7 * 86400000) {
+          items.push({
+            id: 'level:' + cls.id + ':' + L.isoDay(end),
+            kind: 'level',
+            title: L.currentName(cls) + ' sắp hết trình độ',
+            text: 'Đếm ngược tới hết ngày buổi cuối.',
+            until: end.toISOString(),
+            createdAt: new Date(end.getTime() - 7 * 86400000).toISOString()
+          });
+        }
+      }
+      (cls.students || []).forEach(function (stu) {
+        if (!stu || stu.status !== 'stopped') return;
+        var phase = L.studentPhase(cls, stu, when);
+        if (phase.kind === 'archive') return;
+        items.push({
+          id: 'stop:' + cls.id + ':' + stu.id,
+          kind: 'stopped',
+          title: 'Học viên dừng · ' + L.currentName(cls),
+          text: (stu.name || 'Học viên') + (phase.reason ? ' · ' + phase.reason : ''),
+          until: phase.until ? phase.until.toISOString() : '',
+          createdAt: stu.stoppedAt || when.toISOString()
+        });
+      });
+    });
+    (state.exams || []).forEach(function (exam) {
+      var dates = exam.examDates && exam.examDates.length ? exam.examDates : [];
+      (exam.entries || []).forEach(function (entry) {
+        var entryDates = entry.examDates && entry.examDates.length ? entry.examDates : (entry.examDate ? [entry.examDate] : dates);
+        var cls = findClass(entry.classId);
+        if (!cls || !isCmOf(acc, cls)) return;
+        entryDates.forEach(function (iso) {
+          var day = L.parseDateInput(iso);
+          if (!day) return;
+          var end = new Date(day.getTime());
+          end.setHours(23, 59, 59, 999);
+          var lead = end.getTime() - when.getTime();
+          if (lead < 0 || lead > 2 * 86400000) return;
+          items.push({
+            id: 'exam:' + exam.id + ':' + entry.classId + ':' + L.isoDay(day),
+            kind: 'exam',
+            title: 'Lịch thi · ' + (exam.name || 'Kỳ thi'),
+            text: L.currentName(cls) + ' · ' + L.formatDMY(day),
+            until: end.toISOString(),
+            createdAt: exam.createdAt || new Date(end.getTime() - 2 * 86400000).toISOString()
+          });
+        });
+      });
+    });
+    (state.tasks || []).forEach(function (task) {
+      if (!task || task.status !== 'open' || task.toUser !== acc.username) return;
+      var age = when.getTime() - new Date(task.createdAt).getTime();
+      items.push({
+        id: 'task:' + task.id,
+        kind: 'task',
+        taskId: task.id,
+        title: 'Đề xuất ' + taskTypeLabel(task.type) + ' · ' + (task.fromName || 'Nhân sự'),
+        text: task.summary || '',
+        warn: age >= 3 * 86400000,
+        until: '',
+        createdAt: task.createdAt
+      });
+    });
+    return items.filter(function (item) {
+      var mark = acc.ack && acc.ack[item.id];
+      if (!mark) return true;
+      if (mark === 'keep') return false;
+      return mark !== today;
+    });
+  }
+
+  function ackItem(id, mode) {
+    var acc = currentAccount();
+    if (!acc) return;
+    if (!acc.ack) acc.ack = {};
+    acc.ack[id] = mode || todayKey(new Date());
+  }
+
+  function paintGate() {
+    var box = document.getElementById('gatebox');
+    if (!box) return;
+    var now = new Date();
+    var items = ui.user ? popupItems(now) : [];
+    var acc = currentAccount();
+    if (!items.length || !acc) {
+      box.classList.add('hidden');
+      box.innerHTML = '';
+      return;
+    }
+    var primed = !!acc.popupPrimed;
+    var startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    var cards = items.map(function (item) {
+      var clock = item.until ? '<span class="gate-clock" data-until="' + esc(item.until) + '">' + esc(L.countdownLabel(item.until, now)) + '</span>' : '';
+      var warn = item.warn ? '<p class="gate-warn">Đề xuất này chưa được xác nhận hoặc thực hiện từ 3 ngày trở lên.</p>' : '';
+      return '<article class="gate-card"><div class="gate-top"><h3>' + esc(item.title) + '</h3>' + clock + '</div><p>' + esc(item.text) + '</p>' + warn +
+        '<button type="button" class="btn btn-primary" data-act="gate-confirm" data-id="' + esc(item.id) + '">Confirm</button></article>';
+    }).join('');
+    var bulk = primed
+      ? '<label class="checkline"><input type="checkbox" id="gate-all-old"> Confirm toàn bộ thông tin cũ</label><button type="button" class="btn" data-act="gate-confirm-old">Xác nhận thông tin cũ</button>'
+      : '';
+    box.classList.remove('hidden');
+    box.innerHTML = '<div class="gate-card-wrap" data-stop><h2>Việc cần xác nhận</h2><p class="help">Danh sách hiện một lần trong ngày. Confirm từng mục. Khi hết mục, sổ tay mới dùng tiếp.</p>' + cards + bulk + '</div>';
+    box.dataset.today = todayKey(now);
+    box.dataset.old = String(startToday);
+  }
+
+  function paintGateClocks() {
+    var box = document.getElementById('gatebox');
+    if (!box || box.classList.contains('hidden')) return;
+    var now = new Date();
+    box.querySelectorAll('[data-until]').forEach(function (el) {
+      el.textContent = L.countdownLabel(el.getAttribute('data-until'), now);
+    });
+  }
+
+  function finishGateIfClear() {
+    var acc = currentAccount();
+    if (!acc) return;
+    if (popupItems(new Date()).length) {
+      save({ quiet: true });
+      paintGate();
+      return;
+    }
+    acc.popupDay = todayKey(new Date());
+    acc.popupClosedAt = new Date().toISOString();
+    acc.popupPrimed = true;
+    var box = document.getElementById('gatebox');
+    if (box) { box.classList.add('hidden'); box.innerHTML = ''; }
+    save({ quiet: true });
+  }
+
+  function confirmGate(id) {
+    ackItem(id, todayKey(new Date()));
+    finishGateIfClear();
+  }
+
+  function confirmOldGate() {
+    var box = document.getElementById('gate-all-old');
+    if (!box || !box.checked) { toast('Hãy tick Confirm toàn bộ thông tin cũ.'); return; }
+    var start = new Date();
+    start.setHours(0, 0, 0, 0);
+    popupItems(new Date()).forEach(function (item) {
+      if (new Date(item.createdAt).getTime() < start.getTime()) ackItem(item.id, 'keep');
+    });
+    finishGateIfClear();
+  }
+
+  function missedTasks(now) {
+    var acc = currentAccount();
+    if (!acc) return [];
+    var when = now || new Date();
+    return (state.tasks || []).filter(function (task) {
+      if (!task || task.status !== 'open' || task.toUser !== acc.username) return false;
+      return when.getTime() - new Date(task.createdAt).getTime() >= 2 * 86400000;
+    }).sort(function (a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); });
+  }
+
+  function paintMissed() {
+    var btn = document.getElementById('missed-btn');
+    var card = document.getElementById('missed-card');
+    if (!btn || !card) return;
+    var rows = ui.user ? missedTasks(new Date()) : [];
+    btn.classList.toggle('hidden', !rows.length);
+    btn.textContent = rows.length ? 'Bạn bị nhỡ · ' + rows.length : '';
+    if (!rows.length || ui.missedAt < 0) {
+      card.classList.add('hidden');
+      card.innerHTML = '';
+      return;
+    }
+    if (!card.classList.contains('hidden')) paintMissedCard(rows);
+  }
+
+  function paintMissedCard(rows) {
+    var card = document.getElementById('missed-card');
+    var list = rows || missedTasks(new Date());
+    if (!list.length) { card.classList.add('hidden'); return; }
+    if (ui.missedAt >= list.length) ui.missedAt = 0;
+    var task = list[ui.missedAt];
+    card.classList.remove('hidden');
+    card.innerHTML = '<p class="missed-kicker">Bạn bị nhỡ</p><h3>' + esc(taskTypeLabel(task.type)) + '</h3><p>' + esc(task.summary || '') + '</p><p class="meta">' + esc(task.fromName || '') + '</p>' +
+      '<div class="btn-row"><button type="button" class="btn" data-act="missed-next">Next</button><button type="button" class="btn btn-primary" data-act="missed-open">Xem task</button></div>';
+  }
+
+  function mailTasks() {
+    var acc = currentAccount();
+    var month = ui.mailMonth || L.monthKey(new Date());
+    return (state.tasks || []).filter(function (task) {
+      if (!task) return false;
+      var mine = !acc || acc.role === 'admin' || task.toUser === acc.username || task.fromUser === acc.username;
+      if (!mine) return false;
+      var key = task.month || String(task.createdAt || '').slice(0, 7);
+      return key === month;
+    }).sort(function (a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); });
+  }
+
+  function taskClosed(task) {
+    if (!task) return true;
+    return task.status === 'done' || task.status === 'rejected';
+  }
+
+  function paintMail() {
+    var panel = document.getElementById('mailbox');
+    var btn = document.getElementById('mail-btn');
+    if (!panel || !btn) return;
+    var openCount = (state.tasks || []).filter(function (task) {
+      var acc = currentAccount();
+      return task && task.status === 'open' && acc && task.toUser === acc.username;
+    }).length;
+    btn.classList.toggle('hidden', !ui.user);
+    btn.textContent = openCount ? 'Task mail · ' + openCount : 'Task mail';
+    if (panel.classList.contains('hidden')) return;
+    var month = ui.mailMonth || L.monthKey(new Date());
+    ui.mailMonth = month;
+    var rows = mailTasks();
+    var list = rows.map(function (task) {
+      var dim = taskClosed(task) ? ' is-dim' : '';
+      var on = ui.mailId === task.id ? ' is-on' : '';
+      return '<button type="button" class="mail-row' + dim + on + '" data-act="mail-open" data-id="' + esc(task.id) + '"><b>' + esc(taskTypeLabel(task.type)) + '</b><span>' + esc(task.summary || '') + '</span><small>' + esc(task.status === 'open' ? 'Mới' : (task.status === 'done' ? 'Đã xong' : 'Từ chối')) + '</small></button>';
+    }).join('') || '<p class="muted">Không có task trong tháng này.</p>';
+    var detail = '';
+    var task = rows.filter(function (item) { return item.id === ui.mailId; })[0];
+    if (task) detail = mailDetail(task);
+    panel.innerHTML = '<div class="mail-head"><h2>Task mail</h2><button type="button" class="icon-x" data-act="mail-close" aria-label="Đóng">X</button></div>' +
+      '<label class="field"><span>Tháng</span><input id="mail-month" type="month" value="' + esc(month) + '"></label>' +
+      '<div class="mail-list">' + list + '</div>' + detail;
+  }
+
+  function mailDetail(task) {
+    var acc = currentAccount();
+    var mine = acc && task.toUser === acc.username;
+    var closed = taskClosed(task);
+    var actions = '';
+    if (!closed && mine && ui.rejectId === task.id) {
+      actions = '<label class="field"><span>Lý do từ chối</span><textarea id="reject-reason"></textarea></label>' +
+        '<div class="btn-row"><button type="button" class="btn btn-danger" data-act="task-reject-send" data-id="' + esc(task.id) + '">Gửi từ chối</button>' +
+        '<button type="button" class="btn" data-act="task-reject-cancel">Hủy</button></div>';
+    } else if (!closed && mine && (task.type === 'other' || canStudentOps())) {
+      actions = '<div class="btn-row"><button type="button" class="btn btn-primary" data-act="task-do" data-id="' + esc(task.id) + '">Thực hiện</button>' +
+        '<button type="button" class="btn btn-danger" data-act="task-reject" data-id="' + esc(task.id) + '">Từ chối</button></div>';
+    } else if (!closed && mine) {
+      actions = '<p class="help">Tài khoản này không có quyền thực hiện đề xuất này.</p><div class="btn-row"><button type="button" class="btn btn-danger" data-act="task-reject" data-id="' + esc(task.id) + '">Từ chối</button></div>';
+    }
+    if (closed) actions = '<p class="help">Task này đã ' + (task.status === 'done' ? 'hoàn thành' : 'từ chối') + '. Chỉ xem lại.</p>';
+    var reject = task.rejectReason ? '<p>Lý do từ chối: ' + esc(task.rejectReason) + '</p>' : '';
+    return '<article class="mail-detail' + (closed ? ' is-dim' : '') + '"><h3>' + esc(taskTypeLabel(task.type)) + '</h3><p>' + esc(task.summary || '') + '</p>' +
+      '<p class="meta">Từ ' + esc(task.fromName || '—') + ' · tới ' + esc(task.toName || '—') + '</p>' + reject + actions + '</article>';
+  }
+
+  function paintNotices() {
+    var box = document.getElementById('noticebox');
+    if (!box || box.classList.contains('hidden')) return;
+    var month = ui.noticeMonth || ui.boardMonth || L.monthKey(new Date());
+    ui.noticeMonth = month;
+    var items = state.announcements.filter(function (item) { return item && item.kind !== 'post' && item.month === month; }).slice().reverse();
+    var body = items.length ? items.map(function (item) {
+      return '<article class="notice-row"><p>' + esc(item.text || '') + '</p><small>' + esc(feedWhen(item)) + '</small></article>';
+    }).join('') : '<p class="muted">Chưa có thông báo data trong tháng này.</p>';
+    box.innerHTML = '<div class="notice-card" data-stop><div class="mail-head"><h2>Thông báo data</h2><button type="button" class="icon-x" data-act="notice-close" aria-label="Đóng">X</button></div>' +
+      '<label class="field"><span>Tháng</span><input id="notice-month" type="month" value="' + esc(month) + '"></label>' + body + '</div>';
+  }
+
+  function paintDesk() {
+    var signed = !!ui.user;
+    var mail = document.getElementById('mail-btn');
+    var missed = document.getElementById('missed-btn');
+    if (mail) mail.classList.toggle('hidden', !signed);
+    if (missed) missed.classList.toggle('hidden', !signed);
+    if (!signed) {
+      var gate = document.getElementById('gatebox');
+      var panel = document.getElementById('mailbox');
+      var card = document.getElementById('missed-card');
+      if (gate) { gate.classList.add('hidden'); gate.innerHTML = ''; }
+      if (panel) panel.classList.add('hidden');
+      if (card) card.classList.add('hidden');
+      return;
+    }
+    paintMail();
+    paintMissed();
+    paintNotices();
+    paintGateClocks();
+  }
+
+  function skinOf(acc) {
+    var look = acc && acc.appearance;
+    if (look && SKIN_IDS.indexOf(look.skin) >= 0) return look.skin;
+    return 'default';
+  }
+
+  function applyAccountLook() {
+    var acc = currentAccount();
+    var root = document.documentElement;
+    var skin = skinOf(acc);
+    root.setAttribute('data-skin', skin);
+    var theme = state.settings.theme === 'night' ? 'night' : 'day';
+    var primary = PRIMARY_IDS.indexOf(state.settings.primary) >= 0 ? state.settings.primary : 'ocean';
+    if (acc && acc.appearance && skin === 'default') {
+      if (acc.appearance.theme) theme = acc.appearance.theme === 'night' ? 'night' : 'day';
+      if (PRIMARY_IDS.indexOf(acc.appearance.primary) >= 0) primary = acc.appearance.primary;
+    }
+    root.setAttribute('data-theme', theme);
+    root.setAttribute('data-primary', primary);
+    var look = document.getElementById('default-look');
+    if (look) look.hidden = skin !== 'default';
+    document.querySelectorAll('[data-skin-btn]').forEach(function (btn) {
+      var on = btn.getAttribute('data-skin') === skin;
+      btn.classList.toggle('is-on', on);
+    });
   }
 
   function wait(ms) {
@@ -1018,7 +1625,8 @@
     }
     return '<section class="board" aria-label="Bảng thông báo theo tháng">' +
       '<div class="board-head"><span>Bảng thông báo · ' + esc(L.monthLabel(month)) + '</span>' +
-      '<span class="tool-row"><button type="button" class="icon-btn" data-act="board-shift" data-dir="-1" aria-label="Tháng trước">‹</button>' +
+      '<span class="tool-row"><button type="button" class="icon-btn" data-act="open-notices" aria-label="Xem đủ thông báo data">☰</button>' +
+      '<button type="button" class="icon-btn" data-act="board-shift" data-dir="-1" aria-label="Tháng trước">‹</button>' +
       '<button type="button" class="icon-btn" data-act="board-shift" data-dir="1" aria-label="Tháng sau">›</button></span></div>' +
       body + '</section>';
   }
@@ -1064,8 +1672,7 @@
       var at = new Date(state.settings.savedAt);
       when = L.formatDMY(at) + ' ' + L.formatAmPm(at);
     }
-    return '<div class="savebar"><span>Data được cập nhật lần cuối: ' + esc(when) + '</span>' +
-      '<button type="button" class="btn btn-danger" data-act="request-update">Yêu cầu cập nhật</button></div>';
+    return '<div class="savebar"><span>Data được cập nhật lần cuối: ' + esc(when) + '</span></div>';
   }
 
   function currentWeekStats(filter) {
@@ -1166,7 +1773,7 @@
       '<p>Chuyên cần theo buổi trong tháng.</p></button>' +
       '<button type="button" class="menu-card" data-act="nav" data-screen="feed">' + iconFeed() +
       '<div class="kicker">D · BOARD</div><h2>Thông báo và đề xuất</h2>' +
-      '<p>Thông báo nhân sự và bảng thay đổi data.</p></button>' +
+      '<p>Thông báo nhân sự và đề xuất.</p></button>' +
       '<button type="button" class="menu-card" data-act="nav" data-screen="archive">' + iconArchive() +
       '<div class="kicker">E · STUDENT ARCHIVE</div><h2>Thư viện học viên</h2>' +
       '<p>Official đang học. Học viên cũ/kết thúc đã dừng hoặc hết hạn.</p></button>' +
@@ -1349,6 +1956,7 @@
       entries: entries
     });
     examsSeen = true;
+    logAction('tạo lịch, tổ chức buổi thi ' + String(w.name || '').trim());
     ui.examWizard = null;
     ui.examId = examId;
     ui.examWeek = '';
@@ -1370,7 +1978,7 @@
     }).join('') : '<p class="muted">Chưa có đợt thi.</p>';
     return shell('<div class="section-head"><div><button type="button" class="btn" data-act="nav" data-screen="menu">← Menu</button>' +
       '<h2>Kỳ thi</h2><p class="meta">Mục G</p></div><div class="btn-row">' +
-      (canEdit() ? '<button type="button" class="btn btn-primary" data-act="exam-create">+ Tạo đợt thi</button>' : '') +
+      (canExamOps() ? '<button type="button" class="btn btn-primary" data-act="exam-create">+ Tạo đợt thi</button>' : '') +
       '</div></div>' +
       '<p class="help">Mỗi đợt thi là một thư mục. Theo lớp lấy học viên chính thức và trial của các lớp được chọn. Chọn lọc thêm khoảng tuổi. Ngày thi chọn trên lịch tháng, có thể nhiều ngày. Học bổng và học viên không thuộc hai nhóm đó được thêm sau bằng Thêm học viên test.</p>' +
       '<div class="folder-grid">' + cards + '</div>');
@@ -1427,10 +2035,10 @@
     var rows = entry.students || [];
     if (!rows.length) return '<tr><td colspan="5">Chưa có học viên trong thẻ này.</td></tr>';
     return rows.map(function (stu) {
-      var score = canEdit()
+      var score = canExamOps()
         ? '<input data-exam-score data-exam="' + esc(exam.id) + '" data-entry="' + esc(entry.classId) + '" data-stu="' + esc(stu.studentId) + '" value="' + esc(stu.score || '') + '">'
         : esc(stu.score || '—');
-      var review = canEdit()
+      var review = canExamOps()
         ? '<input data-exam-review data-exam="' + esc(exam.id) + '" data-entry="' + esc(entry.classId) + '" data-stu="' + esc(stu.studentId) + '" value="' + esc(stu.review || '') + '">'
         : esc(stu.review || '—');
       return '<tr><td>' + esc(stu.name || '—') + (stu.extra ? ' <span class="tag">Test</span>' : '') + '</td><td>' + esc(stu.englishName || '—') + '</td><td>' +
@@ -1496,7 +2104,7 @@
       var dates = examDateList(entry).map(function (iso) {
         return L.formatDMY(L.parseDateInput(iso));
       }).join(', ');
-      var extra = canEdit()
+      var extra = canExamOps()
         ? '<label class="field"><span>Thêm học viên test</span><input data-exam-extra data-entry="' + esc(entry.classId) + '" placeholder="Tên hoặc mã trong lớp" autocomplete="off"></label>' +
           '<div class="rejoin-list" id="extra-' + esc(entry.classId) + '"></div>'
         : '';
@@ -1508,11 +2116,11 @@
     return shell('<div class="section-head"><div><button type="button" class="btn" data-act="exam-list">← Kỳ thi</button>' +
       '<h2>' + esc(exam.name) + '</h2><p class="meta">' + (exam.type === 'pick' ? 'Chọn lọc' : 'Theo lớp') + '</p>' + age + '</div></div>' +
       '<p class="help">Lịch tuần tính từ tuần của ngày thi sớm nhất tới tuần của ngày thi muộn nhất.</p>' +
-      (canEdit() ? '' : '<p class="help">Tài khoản này chỉ xem điểm và đánh giá.</p>') + chips + cards);
+      (canExamOps() ? '' : '<p class="help">Tài khoản này chỉ xem điểm và đánh giá.</p>') + chips + cards);
   }
 
   function viewExam() {
-    if (ui.examWizard && canEdit()) return examWizardView();
+    if (ui.examWizard && canExamOps()) return examWizardView();
     if (ui.examId) return examDetailView();
     return examListView();
   }
@@ -1966,7 +2574,7 @@
           (phase.reason ? '<small>' + esc(phase.reason) + '</small>' : '') + '</div>'
         : '';
       var picked = ui.selected[stu.id] ? ' checked' : '';
-      return '<tr class="' + rowCls + '">' + (canEdit() ? '<td><input type="checkbox" data-pick="' + esc(stu.id) + '"' + picked + ' aria-label="Chọn ' + esc(stu.name) + '"></td>' : '') +
+      return '<tr class="' + rowCls + '">' + (canStudentOps() ? '<td><input type="checkbox" data-pick="' + esc(stu.id) + '"' + picked + ' aria-label="Chọn ' + esc(stu.name) + '"></td>' : '') +
         '<td>' + (gray ? '' : (index + 1)) + '</td>' +
         '<td>' + esc(showText(stu.code)) + '</td>' +
         '<td><button type="button" class="stu-name' + (stu.id === openId ? ' is-open' : '') + '" data-act="open-student" data-id="' + esc(stu.id) + '">' + esc(showText(stu.name)) + '</button>' + mark + note + card + '</td>' +
@@ -1995,11 +2603,12 @@
       return '<span class="slot-pill">' + esc(day.short) + ' ' + esc(L.formatTimeValue(slot.start)) + ' – ' + esc(L.formatTimeValue(slot.end)) + '</span>';
     }).join('');
     var edit = canEdit();
+    var studentOps = canStudentOps();
     var table = '<div class="table-wrap" id="roster-table"><table><thead><tr>' +
-      (edit ? '<th><input type="checkbox" data-pick-all ' + (allOn ? 'checked' : '') + ' aria-label="Chọn tất cả"></th>' : '') +
+      (studentOps ? '<th><input type="checkbox" data-pick-all ' + (allOn ? 'checked' : '') + ' aria-label="Chọn tất cả"></th>' : '') +
       '<th>STT</th><th>Mã học viên</th><th>Học viên</th><th>English name</th><th>Giới tính</th><th>Ngày sinh</th><th>Tuổi</th><th>First EC</th>' +
       (edit ? '<th>Sửa</th>' : '') +
-      '</tr></thead><tbody>' + ((roster.listed.length || roster.gray.length) ? studentRows(roster.listed, now, ui.detailId) + studentRows(roster.gray, now, ui.detailId) : '<tr><td colspan="' + (edit ? 10 : 8) + '">Chưa có học viên đang học.</td></tr>') + '</tbody></table></div>';
+      '</tr></thead><tbody>' + ((roster.listed.length || roster.gray.length) ? studentRows(roster.listed, now, ui.detailId) + studentRows(roster.gray, now, ui.detailId) : '<tr><td colspan="' + (8 + (studentOps ? 1 : 0) + (edit ? 1 : 0)) + '">Chưa có học viên đang học.</td></tr>') + '</tbody></table></div>';
     var stoppedHtml = paused.length ? '<div id="paused-list"><h3>Đã dừng học</h3>' +
       '<p class="help">Các em hiện riêng, không có số thứ tự. Dòng giải trình đi cùng đếm ngược 7 ngày, rồi chuyển vào Học viên cũ/kết thúc.</p>' +
       '<div class="table-wrap"><table><thead><tr><th>Mã</th><th>Học viên</th><th>Giải trình</th><th>Đếm ngược</th>' + (edit ? '<th></th>' : '') + '</tr></thead><tbody>' +
@@ -2011,9 +2620,9 @@
       }).join('') + '</tbody></table></div></div>' : '';
     var n = selectedIds().length;
     var printBtn = canExportClasses() ? '<button type="button" class="btn" data-act="print-students">Print (in)</button>' : '';
-    var tools = (edit || printBtn) ? '<div class="btn-row">' +
-      (edit ? '<button type="button" class="btn" data-act="edit-class">Sửa lớp</button>' +
-      '<button type="button" class="btn" data-act="open-import">Cập nhật Excel</button>' +
+    var tools = (edit || canClassOps() || printBtn) ? '<div class="btn-row">' +
+      (canClassOps() ? '<button type="button" class="btn" data-act="edit-class">Sửa lớp</button>' : '') +
+      (edit ? '<button type="button" class="btn" data-act="open-import">Cập nhật Excel</button>' +
       '<button type="button" class="btn btn-primary" data-act="open-add-student">+ Thêm học viên</button>' : '') +
       printBtn + '</div>' : '';
     return shell('<div class="class-head"><div><button type="button" class="btn" data-act="nav" data-screen="classes">← Danh sách lớp</button>' +
@@ -2025,7 +2634,7 @@
       '<div class="stat"><b>Ngày kết thúc</b>' + esc(endLabel(cls, progress)) + '</div>' +
       '<div class="stat"><b>Khai giảng</b>' + esc(L.formatDMY(cls.levelHistory[0].from)) + '</div>' +
       '<div class="stat"><b>Lesson</b>' + progress.done + '/' + progress.total + ' · ' + (cls.schedule || []).length + ' buổi/tuần</div>' +
-      '<div class="stat"><b>FET</b>' + esc(L.staffText(cls.fet)) + '</div>' +
+      '<div class="stat"><b>FET</b>' + esc(L.staffText(L.classFetNames(cls).join(', '))) + '</div>' +
       '<div class="stat"><b>CM phụ trách</b>' + esc(L.staffText(cls.cm)) + '</div>' +
       '<div class="stat"><b>TA phụ trách</b>' + esc(L.staffText(cls.ta)) + '</div></div>' +
       '<div class="slot-list">' + (slotHtml || '<span class="muted">Chưa có lịch học.</span>') + '</div>' +
@@ -2035,10 +2644,10 @@
       '<button type="button" class="btn' + (ui.sort === 'dob' ? ' btn-primary' : '') + '" data-act="sort" data-sort="dob">Theo ngày sinh</button></div>' +
       '<p class="help">Chính thức có số thứ tự. Học bổng đánh dấu vàng Học viên 1 tháng và có số thứ tự đến khi hết số buổi. Trial đúng một buổi: nếu ngày đó đã qua và chưa chuyển lớp, dòng nằm cuối bảng màu xám, không có số thứ tự. Học viên outdated cũng là dòng xám và hiện thời gian xóa tự động. Nút Dừng cần một dòng giải trình. Học viên đó rời danh sách có số thứ tự, hiện riêng phía dưới, không có số thứ tự, và đếm ngược 7 ngày trước khi vào Học viên cũ/kết thúc. Sĩ số có số thứ tự tối đa 20.</p>' +
       (canExportClasses() ? '<p class="help">Print (in) in các hàng học viên đã tick. Không tick thì in cả bảng đang xem, kể cả dòng xám không số thứ tự.</p>' : '') +
-      (edit ? '<div class="bulk-bar" id="bulk-bar"' + (n ? '' : ' hidden') + '><strong>Đã chọn <span id="bulk-count">' + n + '</span></strong>' +
-      '<div class="btn-row"><button type="button" class="btn" data-act="bulk-transfer">Chuyển lớp</button>' +
-      '<button type="button" class="btn" data-act="bulk-expire">Dừng</button>' +
-      '<button type="button" class="btn btn-danger" data-act="bulk-delete">Xóa học viên</button></div></div>' : '') +
+      (studentOps || edit ? '<div class="bulk-bar" id="bulk-bar"' + (n ? '' : ' hidden') + '><strong>Đã chọn <span id="bulk-count">' + n + '</span></strong>' +
+      '<div class="btn-row">' + (studentOps ? '<button type="button" class="btn" data-act="bulk-transfer">Chuyển lớp</button>' : '') +
+      (edit ? '<button type="button" class="btn" data-act="bulk-expire">Dừng</button>' : '') +
+      (studentOps ? '<button type="button" class="btn btn-danger" data-act="bulk-delete">Xóa học viên</button>' : '') + '</div></div>' : '') +
       table + stoppedHtml + detailHtml() + modalHtml());
   }
 
@@ -2190,7 +2799,7 @@
                 return '<div class="tt-card tt-soa"><strong>' + esc(chip.name) + '</strong><small>SOA · Office</small><small>FET: ' +
                   esc(L.staffText(chip.fet)) + '</small>' + drop + '</div>';
               }
-              var act = canEdit() ? 'schedule-pick' : 'open-class';
+              var act = (canScheduleOps() || canClassOps()) ? 'schedule-pick' : 'open-class';
               var tag = chip.tag ? '<small class="tt-tag">' + esc(chip.tag) + '</small>' : '';
               return '<button type="button" class="tt-card group-' + esc(String(chip.group).toLowerCase()) + '" data-act="' + act + '" data-id="' + esc(chip.id) + '" data-key="' + esc(chip.sessionKey || '') + '" data-iso="' + esc(chip.iso || '') + '" data-start="' + esc(chip.start || '') + '" data-end="' + esc(chip.end || '') + '">' +
                 bangHtml(chip.alert) + '<strong>' + esc(chip.name) + '</strong>' + tag + '<small>FET: ' + esc(L.staffText(chip.fet)) + '</small>' +
@@ -2822,9 +3431,24 @@
 
   function scheduleChoiceForm() {
     var cls = findClass(ui.modal.id);
+    var fetBox = '';
+    if (cls && canClassOps()) {
+      var key = String(ui.modal.iso || '') + '|' + String(ui.modal.start || '');
+      var override = cls.sessionFets && cls.sessionFets[key] ? cls.sessionFets[key] : '';
+      var names = {};
+      L.classFetNames(cls).forEach(function (name) { names[name] = true; });
+      L.FET.forEach(function (name) { names[name] = true; });
+      var options = '<option value="">FET lớp</option>' + Object.keys(names).map(function (name) {
+        return '<option value="' + esc(name) + '"' + (override === name ? ' selected' : '') + '>' + esc(name) + '</option>';
+      }).join('');
+      fetBox = '<label class="field"><span>FET phụ trách buổi này</span><select id="session-fet">' + options + '</select></label>' +
+        '<p class="help">Mục này chỉ hiện khi buổi đã được chọn. Chọn FET lớp thì buổi dùng FET của lớp. Buổi nào chọn giáo viên khác thì hồ sơ lớp hiện đủ các FET đang phụ trách.</p>';
+    }
+    var move = canScheduleOps() ? '<button type="button" class="btn btn-primary" data-act="move-session">Hủy/ đổi buổi</button>' : '';
+    var saveFet = canClassOps() ? '<button type="button" class="btn" data-act="save-session-fet">Lưu FET buổi</button>' : '';
     return modalShell('Buổi học',
-      '<p><b>' + esc(cls ? L.currentName(cls) : '') + '</b></p><p>' + esc(sessionLabel(ui.modal)) + '</p>',
-      '<button type="button" class="btn btn-primary" data-act="move-session">Hủy/ đổi buổi</button>' +
+      '<p><b>' + esc(cls ? L.currentName(cls) : '') + '</b></p><p>' + esc(sessionLabel(ui.modal)) + '</p>' + fetBox,
+      move + saveFet +
       '<button type="button" class="btn" data-act="open-class" data-id="' + esc(ui.modal.id) + '">Xem chi tiết lớp</button>');
   }
 
@@ -2844,14 +3468,72 @@
       '<button type="button" class="btn btn-primary" data-act="save-move">Lưu</button><button type="button" class="btn" data-act="close-modal">Hủy</button>');
   }
 
+  function classPickButtons(selectedId) {
+    return state.classes.slice().sort(function (a, b) {
+      return L.currentName(a).localeCompare(L.currentName(b), 'vi');
+    }).map(function (cls) {
+      var on = selectedId === cls.id ? ' is-on' : '';
+      return '<button type="button" class="pick-opt' + on + '" data-act="suggest-class" data-id="' + esc(cls.id) + '" data-name="' + esc(L.currentName(cls).toLowerCase()) + '">' +
+        '<span>' + esc(L.currentName(cls)) + '<small>' + esc(L.scheduleText(cls)) + '</small></span></button>';
+    }).join('');
+  }
+
   function suggestForm() {
+    var draft = ui.suggest || { type: 'transfer' };
+    var type = draft.type || 'transfer';
+    var people = suggestRecipients(type);
+    var personOptions = '<option value="">Chọn nhân sự</option>' + people.map(function (acc) {
+      return '<option value="' + esc(acc.username) + '"' + (draft.to === acc.username ? ' selected' : '') + '>' + esc(acc.name) + '</option>';
+    }).join('');
+    var student = null;
+    var fromClass = null;
+    if (draft.studentId) {
+      state.classes.forEach(function (cls) {
+        (cls.students || []).forEach(function (stu) {
+          if (stu && stu.id === draft.studentId) { student = stu; fromClass = cls; }
+        });
+      });
+    }
+    var studentList = '';
+    if (type === 'transfer') {
+      var q = String(draft.query || '').trim().toLowerCase();
+      var hits = [];
+      state.classes.forEach(function (cls) {
+        (cls.students || []).forEach(function (stu) {
+          if (!stu || stu.status === 'stopped') return;
+          var blob = (stu.name + ' ' + (stu.code || '')).toLowerCase();
+          if (q && blob.indexOf(q) < 0) return;
+          hits.push({ stu: stu, cls: cls });
+        });
+      });
+      studentList = '<label class="field"><span>Tìm học viên</span><input id="suggest-q" value="' + esc(draft.query || '') + '" placeholder="Tên học viên" autocomplete="off"></label>' +
+        '<div class="pick-grid">' + hits.slice(0, 30).map(function (hit) {
+          var on = draft.studentId === hit.stu.id ? ' is-on' : '';
+          return '<button type="button" class="pick-opt' + on + '" data-act="suggest-student" data-id="' + esc(hit.stu.id) + '"><span>' + esc(hit.stu.name) + '<small>' + esc(L.currentName(hit.cls)) + '</small></span></button>';
+        }).join('') + '</div>' +
+        (student ? '<p class="help">Lớp hiện tại: ' + esc(L.currentName(fromClass)) + ' · ' + esc(L.scheduleText(fromClass)) + '</p>' : '') +
+        '<p class="field-label">Lớp chuyển đến</p><div class="pick-grid" id="suggest-classes">' + classPickButtons(draft.classId) + '</div>' +
+        '<label class="field"><span>Lý do chuyển</span><textarea id="suggest-reason" required>' + esc(draft.reason || '') + '</textarea></label>';
+    }
+    var addBlock = type === 'add'
+      ? '<label class="field"><span>Tên học viên</span><input id="suggest-name" value="' + esc(draft.name || '') + '" required></label>' +
+        '<label class="field"><span>Ngày sinh</span><input id="suggest-dob" type="date" value="' + esc(draft.dob || '') + '"></label>' +
+        '<label class="field"><span>Tên tiếng Anh</span><input id="suggest-en" value="' + esc(draft.englishName || '') + '"></label>' +
+        '<label class="field"><span>Số điện thoại</span><input id="suggest-phone" value="' + esc(draft.phone || '') + '"></label>' +
+        '<label class="field"><span>EC phụ trách</span><input id="suggest-ec" value="' + esc(draft.ec || '') + '"></label>' +
+        '<p class="field-label">Lớp nhận học viên</p><div class="pick-grid" id="suggest-classes">' + classPickButtons(draft.classId) + '</div>'
+      : '';
+    var otherBlock = type === 'other'
+      ? '<label class="field"><span>Nội dung</span><textarea id="suggest-text" maxlength="1500">' + esc(draft.text || '') + '</textarea></label>'
+      : '';
     return modalShell('Đề xuất',
       '<label class="field"><span>Loại đề xuất</span><select id="suggest-type">' +
-      '<option value="add">Add học viên</option>' +
-      '<option value="transfer">Chuyển lớp</option>' +
-      '<option value="other">Khác</option></select></label>' +
-      '<label class="field"><span>Nội dung</span><textarea id="suggest-text" maxlength="1500"></textarea></label>' +
-      '<p class="help">Gửi lên Google Sheet. Username vào cột Mã nhân sự, tên hiển thị vào cột Tên nhân sự, nội dung vào cột Nội dung. Số thứ tự và thời gian do bảng tính ghi. Mỗi loại vào một thẻ riêng.</p>',
+      '<option value="transfer"' + (type === 'transfer' ? ' selected' : '') + '>Chuyển lớp</option>' +
+      '<option value="add"' + (type === 'add' ? ' selected' : '') + '>Thêm học viên</option>' +
+      '<option value="other"' + (type === 'other' ? ' selected' : '') + '>Khác</option></select></label>' +
+      '<label class="field"><span>Nhân sự nhận</span><select id="suggest-to">' + personOptions + '</select></label>' +
+      '<p class="help">Nhân sự không có quyền chuyển lớp hoặc thêm học viên sẽ không có trong danh sách của hai loại đó.</p>' +
+      studentList + addBlock + otherBlock,
       '<button type="button" class="btn btn-primary" data-act="suggest-send">Gửi</button><button type="button" class="btn" data-act="close-modal">Hủy</button>');
   }
 
@@ -2892,11 +3574,9 @@
     var suggest = canSuggest() ? '<button type="button" class="btn btn-primary" data-act="suggest-open">Đề xuất</button>' : '';
     return shell('<div class="section-head"><div><button type="button" class="btn" data-act="nav" data-screen="menu">← Menu</button>' +
       '<h2>Thông báo và đề xuất</h2>' +
-      '<p class="help">Hai khung riêng. Khung nhân sự là thông báo Admin đăng. Khung data là dòng hệ thống: lớp mới, chuyển lớp, lên cấp, lớp còn dưới 3 buổi, học viên chuyển vào lưu trữ. Đổi tháng bằng mũi tên trên bảng phía trên.</p></div>' +
+      '<p class="help">Mục này là thông báo nhân sự đăng. Thông báo data chỉ ở menu chính. Bấm biểu tượng trên bảng để xem đủ theo tháng.</p></div>' +
       '<div class="btn-row">' + suggest + '</div></div>' +
-      '<div class="feed-split">' +
-      '<section class="feed-frame"><h3>Thông tin cập nhật tháng của nhân sự</h3>' + composer + postBody + '</section>' +
-      '<section class="feed-frame"><h3>Bảng thông báo thay đổi data</h3>' + systemBody + '</section></div>' + modalHtml());
+      '<section class="feed-frame"><h3>Thông tin cập nhật tháng của nhân sự</h3>' + composer + postBody + '</section>' + modalHtml());
   }
 
   function archivePeople() {
@@ -3177,6 +3857,19 @@
     paintClock();
     paintThemeButtons();
     paintTransferLevel();
+    applyAccountLook();
+    pulseMinimal();
+    paintDesk();
+  }
+
+  function pulseMinimal() {
+    var app = document.getElementById('app');
+    if (!app) return;
+    app.classList.remove('is-enter');
+    if (document.documentElement.getAttribute('data-skin') !== 'minimal') return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    void app.offsetWidth;
+    app.classList.add('is-enter');
   }
 
   function readSchedule(form) {
@@ -3325,7 +4018,9 @@
   }
 
   function saveClass(form) {
-    if (deny(canEdit())) return;
+    var editingClass = !!(ui.modal && ui.modal.type === 'edit-class');
+    if (editingClass) { if (deny(canClassOps())) return; }
+    else if (deny(canEdit())) return;
     var slots = readSchedule(form);
     var problem = validateSchedule(slots);
     if (problem) { showFormError(problem); return; }
@@ -3371,6 +4066,7 @@
       if (edited.name && edited.name !== oldName) {
         L.pushNotice(state, new Date(), L.formatDMY(new Date()) + ': đổi ' + oldName + ' thành ' + edited.name + '.');
       }
+      logAction('thay đổi thông tin lớp ' + L.currentName(cls));
       finishClassSave('Đã lưu thông tin lớp.', edited.identity ? cls.id : '');
       return;
     }
@@ -3411,6 +4107,7 @@
     if (!created) { showFormError('Chưa tạo được lớp.'); return; }
     state.classes.push(created);
     L.pushNotice(state, new Date(), L.formatDMY(new Date()) + ': thêm lớp mới ' + L.currentName(created) + '.');
+    logAction('tạo lớp ' + L.currentName(created));
     finishClassSave('Đã tạo ' + L.currentName(created) + '.');
   }
 
@@ -3539,6 +4236,7 @@
   }
 
   function doTransfer() {
+    if (deny(canStudentOps())) return;
     var target = document.getElementById('transfer-target');
     if (!target) return;
     var result = L.transferStudents(state, ui.classId, target.value, selectedIds(), new Date());
@@ -3547,6 +4245,7 @@
     ui.selected = {};
     ui.modal = null;
     ui.formError = '';
+    logAction('chuyển ' + result.moved.length + ' học viên tới ' + result.toName);
     save();
     toast('Đã chuyển ' + result.moved.length + ' học viên tới ' + result.toName + '.' + (result.levelGap ? ' Bạn đang xếp chuyển lớp lệch trình độ.' : ''));
     render();
@@ -3573,12 +4272,14 @@
     ui.selected = {};
     ui.modal = null;
     ui.formError = '';
+    logAction('dừng ' + n + ' học viên');
     save();
     toast('Đã dừng ' + n + ' học viên.');
     render();
   }
 
   function doDeleteStudents(ids) {
+    if (deny(canStudentOps())) return;
     var cls = findClass(ui.classId);
     if (!cls) return;
     var drop = {};
@@ -3592,6 +4293,7 @@
     state.archive = (state.archive || []).filter(function (stu) { return !drop[stu.id]; });
     ids.forEach(function (id) { delete ui.selected[id]; if (ui.detailId === id) ui.detailId = null; });
     ui.modal = null;
+    logAction('xóa vĩnh viễn ' + n + ' học viên');
     save();
     toast('Đã xóa vĩnh viễn ' + n + ' học viên.');
     render();
@@ -3611,7 +4313,9 @@
   }
 
   function doDeleteClass() {
+    if (deny(canClassOps())) return;
     var cls = findClass(ui.classId);
+    var className = cls ? L.currentName(cls) : 'lớp';
     var drop = {};
     if (cls && Array.isArray(cls.students)) {
       cls.students.forEach(function (stu) { if (stu && stu.id) drop[stu.id] = true; });
@@ -3622,6 +4326,7 @@
     ui.classId = null;
     ui.detailId = null;
     ui.screen = 'classes';
+    logAction('xóa lớp ' + className);
     save();
     toast('Đã xóa lớp.');
     render();
@@ -4135,84 +4840,211 @@
     printSpec(spec);
   }
 
-  function callScript(payload) {
-    return new Promise(function (resolve, reject) {
-      var url = SUGGEST_URL;
-      var cb = 'oceanCb_' + Date.now();
-      var script = document.createElement('script');
-      var timer = setTimeout(function () {
-        cleanup();
-        reject(new Error('Không nhận được phản hồi từ ứng dụng web đề xuất.'));
-      }, 12000);
-      function cleanup() {
-        clearTimeout(timer);
-        try { delete window[cb]; } catch (err) { window[cb] = undefined; }
-        if (script.parentNode) script.parentNode.removeChild(script);
-      }
-      window[cb] = function (result) {
-        cleanup();
-        if (result && result.ok) resolve(result);
-        else reject(new Error((result && result.error) || 'Google Sheet từ chối dữ liệu.'));
-      };
-      var join = url.indexOf('?') >= 0 ? '&' : '?';
-      script.src = url + join + 'callback=' + encodeURIComponent(cb) + '&payload=' + encodeURIComponent(JSON.stringify(payload || {}));
-      script.onerror = function () {
-        cleanup();
-        reject(new Error('Không tải được ứng dụng web đề xuất.'));
-      };
-      document.head.appendChild(script);
-    });
+  function findTask(id) {
+    var key = String(id || '');
+    for (var i = 0; i < (state.tasks || []).length; i++) {
+      if (state.tasks[i] && state.tasks[i].id === key) return state.tasks[i];
+    }
+    return null;
   }
 
-  function requestUpdate() {
-    if (!ui.user || ui.sending) return;
-    ui.sending = true;
-    callScript({
-      action: 'row',
-      type: 'other',
-      username: ui.user.username,
-      name: ui.user.name,
-      content: 'Nhân sự yêu cầu cập nhật sổ tay',
-      red: true
-    }).then(function () {
-      ui.sending = false;
-      toast('Đã gửi yêu cầu cập nhật sổ tay lên thẻ Khác.');
-    }).catch(function (err) {
-      ui.sending = false;
-      toast(err.message || 'Không gửi được.');
-    });
+  function readSuggestDraft() {
+    var draft = ui.suggest || { type: 'transfer' };
+    var typeEl = document.getElementById('suggest-type');
+    var toEl = document.getElementById('suggest-to');
+    if (typeEl) draft.type = typeEl.value || draft.type || 'transfer';
+    if (toEl) draft.to = toEl.value || '';
+    var q = document.getElementById('suggest-q');
+    if (q) draft.query = q.value;
+    var reason = document.getElementById('suggest-reason');
+    if (reason) draft.reason = reason.value;
+    var name = document.getElementById('suggest-name');
+    if (name) draft.name = name.value;
+    var dob = document.getElementById('suggest-dob');
+    if (dob) draft.dob = dob.value;
+    var en = document.getElementById('suggest-en');
+    if (en) draft.englishName = en.value;
+    var phone = document.getElementById('suggest-phone');
+    if (phone) draft.phone = phone.value;
+    var ec = document.getElementById('suggest-ec');
+    if (ec) draft.ec = ec.value;
+    var text = document.getElementById('suggest-text');
+    if (text) draft.text = text.value;
+    ui.suggest = draft;
+    return draft;
+  }
+
+  function saveSessionFet() {
+    if (deny(canClassOps()) || !ui.modal) return;
+    var cls = findClass(ui.modal.id);
+    if (!cls) return;
+    var key = String(ui.modal.iso || '') + '|' + String(ui.modal.start || '');
+    if (!/^\d{4}-\d{2}-\d{2}\|/.test(key)) { showFormError('Buổi này chưa có ngày để gán FET.'); return; }
+    var select = document.getElementById('session-fet');
+    var name = select ? String(select.value || '').trim() : '';
+    if (!cls.sessionFets || typeof cls.sessionFets !== 'object' || Array.isArray(cls.sessionFets)) cls.sessionFets = {};
+    if (!name) delete cls.sessionFets[key];
+    else cls.sessionFets[key] = name;
+    logAction('gán FET buổi ' + sessionLabel(ui.modal) + ' của lớp ' + L.currentName(cls) + (name ? ' cho ' + name : ' về FET lớp'));
+    ui.modal = null;
+    ui.formError = '';
+    save();
+    toast(name ? 'Buổi này do ' + name + ' phụ trách.' : 'Buổi này dùng FET của lớp.');
+    render();
   }
 
   function sendSuggestion() {
     if (deny(canSuggest())) return;
-    var typeEl = document.getElementById('suggest-type');
-    var textEl = document.getElementById('suggest-text');
-    var content = textEl ? textEl.value.trim() : '';
-    if (!content) { showFormError('Hãy viết nội dung đề xuất.'); return; }
-    if (content.length > 1500) { showFormError('Nội dung tối đa 1500 ký tự.'); return; }
-    if (ui.sending) return;
-    ui.sending = true;
-    callScript({
-      action: 'row',
-      type: typeEl ? typeEl.value : 'other',
-      username: ui.user.username,
-      name: ui.user.name,
-      content: content,
-      red: false
-    }).then(function (result) {
-      ui.sending = false;
-      ui.modal = null;
-      ui.formError = '';
-      toast('Đã gửi đề xuất lên thẻ ' + (result.sheet || 'Google Sheet') + '.');
-      render();
-    }).catch(function (err) {
-      ui.sending = false;
-      showFormError(err.message);
-    });
+    var draft = readSuggestDraft();
+    var type = draft.type === 'add' || draft.type === 'other' ? draft.type : 'transfer';
+    var recipient = accountByUsername(draft.to);
+    var allowed = suggestRecipients(type).some(function (acc) { return recipient && acc.username === recipient.username; });
+    if (!recipient || !allowed) { showFormError('Chọn nhân sự nhận đề xuất.'); return; }
+    var now = new Date();
+    var task = {
+      id: L.uid(),
+      type: type,
+      status: 'open',
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+      actedAt: '',
+      month: L.monthKey(now),
+      fromUser: ui.user.username,
+      fromName: ui.user.name,
+      toUser: recipient.username,
+      toName: recipient.name,
+      summary: '',
+      reason: '',
+      rejectReason: '',
+      studentId: '',
+      studentName: '',
+      fromClassId: '',
+      fromClassName: '',
+      toClassId: '',
+      toClassName: '',
+      draft: null
+    };
+    if (type === 'transfer') {
+      if (!draft.studentId) { showFormError('Chọn học viên.'); return; }
+      if (!draft.classId) { showFormError('Chọn lớp chuyển đến.'); return; }
+      var why = String(draft.reason || '').trim();
+      if (!why) { showFormError('Viết lý do chuyển.'); return; }
+      var found = findStudent(draft.studentId);
+      var dest = findClass(draft.classId);
+      if (!found || !dest) { showFormError('Không thấy học viên hoặc lớp.'); return; }
+      if (found.cls.id === dest.id) { showFormError('Học viên đã ở lớp này.'); return; }
+      task.studentId = found.stu.id;
+      task.studentName = found.stu.name || '';
+      task.fromClassId = found.cls.id;
+      task.fromClassName = L.currentName(found.cls);
+      task.toClassId = dest.id;
+      task.toClassName = L.currentName(dest);
+      task.reason = why;
+      task.summary = (found.stu.name || 'Học viên') + ' từ ' + task.fromClassName + ' sang ' + task.toClassName + '. Lý do: ' + why;
+    } else if (type === 'add') {
+      var addName = String(draft.name || '').trim();
+      if (!addName) { showFormError('Điền tên học viên.'); return; }
+      if (!draft.classId) { showFormError('Chọn lớp nhận học viên.'); return; }
+      var host = findClass(draft.classId);
+      if (!host) { showFormError('Không thấy lớp nhận.'); return; }
+      task.toClassId = host.id;
+      task.toClassName = L.currentName(host);
+      task.studentName = addName;
+      task.draft = {
+        name: addName,
+        dob: String(draft.dob || ''),
+        englishName: String(draft.englishName || ''),
+        phone: String(draft.phone || ''),
+        ec: String(draft.ec || '')
+      };
+      task.summary = 'Thêm ' + addName + ' vào ' + task.toClassName + '.';
+    } else {
+      var content = String(draft.text || '').trim();
+      if (!content) { showFormError('Hãy viết nội dung đề xuất.'); return; }
+      if (content.length > 1500) { showFormError('Nội dung tối đa 1500 ký tự.'); return; }
+      task.summary = content;
+      task.reason = content;
+    }
+    if (!state.tasks) state.tasks = [];
+    state.tasks.push(task);
+    tasksSeen = true;
+    logAction('gửi đề xuất ' + taskTypeLabel(task.type) + ' tới ' + recipient.name, recipient.username);
+    ui.modal = null;
+    ui.formError = '';
+    ui.suggest = { type: 'transfer' };
+    save();
+    toast('Đã gửi đề xuất tới ' + recipient.name + '.');
+    render();
+  }
+
+  function performTask(id) {
+    var task = findTask(id);
+    var acc = currentAccount();
+    if (!task || !acc || task.toUser !== acc.username) return;
+    if (taskClosed(task)) { toast('Task này chỉ xem lại.'); return; }
+    if ((task.type === 'transfer' || task.type === 'add') && deny(canStudentOps())) return;
+    var now = new Date();
+    if (task.type === 'transfer') {
+      var moved = L.transferStudents(state, task.fromClassId, task.toClassId, [task.studentId], now);
+      if (moved.error) { toast(moved.error); return; }
+    } else if (task.type === 'add') {
+      var cls = findClass(task.toClassId);
+      if (!cls) { toast('Không thấy lớp nhận.'); return; }
+      if (listedCount(cls, now) >= 20) { toast(ROSTER_FULL); return; }
+      var draft = task.draft || {};
+      var made = L.createStudent({
+        code: L.nextStudentCode(state.classes, state.archive),
+        name: draft.name || task.studentName,
+        dob: draft.dob || '',
+        englishName: draft.englishName || '',
+        phone: draft.phone || '',
+        ec: draft.ec || '',
+        originClassId: cls.id,
+        joinedAt: now.toISOString()
+      });
+      cls.students.push(made);
+      task.studentId = made.id;
+      task.studentName = made.name || task.studentName;
+    }
+    task.status = 'done';
+    task.actedAt = now.toISOString();
+    task.updatedAt = now.toISOString();
+    ackItem('task:' + task.id, 'keep');
+    logAction('thực hiện đề xuất ' + taskTypeLabel(task.type) + ' của ' + (task.fromName || 'nhân sự'), task.fromUser);
+    ui.rejectId = '';
+    save();
+    toast('Đã thực hiện đề xuất.');
+    paintMail();
+    paintGate();
+    paintMissed();
+    render();
+  }
+
+  function rejectTask(id, reason) {
+    var task = findTask(id);
+    var acc = currentAccount();
+    if (!task || !acc || task.toUser !== acc.username) return;
+    if (taskClosed(task)) { toast('Task này chỉ xem lại.'); return; }
+    var why = String(reason || '').trim();
+    if (!why) { toast('Cần ghi lý do từ chối.'); return; }
+    var now = new Date();
+    task.status = 'rejected';
+    task.rejectReason = why;
+    task.actedAt = now.toISOString();
+    task.updatedAt = now.toISOString();
+    ackItem('task:' + task.id, 'keep');
+    logAction('từ chối đề xuất ' + taskTypeLabel(task.type) + ' của ' + (task.fromName || 'nhân sự'), task.fromUser);
+    ui.rejectId = '';
+    save();
+    toast('Đã từ chối đề xuất.');
+    paintMail();
+    paintGate();
+    paintMissed();
+    render();
   }
 
   function saveMove() {
-    if (deny(canEdit()) || !ui.modal) return;
+    if (deny(canScheduleOps()) || !ui.modal) return;
     var cls = findClass(ui.modal.id);
     if (!cls) return;
     var picked = document.querySelector('input[name="move-mode"]:checked');
@@ -4233,6 +5065,7 @@
     if (result.error) { showFormError(result.error); return; }
     var endText = result.last ? L.formatDMY(result.last.endDate) : '—';
     L.pushNotice(state, new Date(), L.formatDMY(new Date()) + ': ' + L.currentName(cls) + ' hủy/đổi buổi ' + when + ' (' + modeLabel + ', lý do: ' + result.reason + '). Kết thúc khóa: ' + endText + '.');
+    logAction('hủy hoặc đổi lịch buổi ' + when + ' của lớp ' + L.currentName(cls));
     ui.modal = null;
     ui.formError = '';
     save();
@@ -4364,13 +5197,10 @@
     var panel = document.getElementById('script-panel');
     if (!panel) return;
     if (!canEdit()) { panel.innerHTML = ''; return; }
-    panel.innerHTML = '<h3>Đề xuất</h3>' +
-      '<p class="help">Form đề xuất và nút yêu cầu cập nhật gửi về ứng dụng web đã triển khai. Add học viên, Chuyển lớp và Khác vào ba thẻ tương ứng.</p>' +
-      '<p class="deploy-url">' + esc(SUGGEST_URL) + '</p>' +
-      '<h3>Bản data dùng chung</h3>' +
+    panel.innerHTML = '<h3>Bản data dùng chung</h3>' +
       '<p class="help">' + esc(classNote) + '</p>' +
       '<p class="help">' + esc(dataNote) + '</p>' +
-      '<p class="help">Sau mỗi lần sửa lớp, học viên, chuyên cần hoặc thông tin cá nhân, app ghi ngay ocean-edu-classes.json và ocean-edu-data.json vào thư mục Index đã chọn. Góc trên bên phải hiện Token đang xoay, rồi chữ confirmed khi cả hai file đã ghi xong. Lúc mở trang, app đọc hai file JSON này để khỏi nhập lại bằng tay. Lần sửa đầu, nếu chưa chọn thư mục, trình duyệt hỏi thư mục Index một lần. Chưa chọn thì dữ liệu vẫn nằm trên trình duyệt và góc app không hiện confirmed. Netlify chỉ phát bản đã đăng, nên máy khác chỉ thấy dữ liệu mới sau khi đăng lại thư mục.</p>' +
+      '<p class="help">Thư mục Index trên ổ D là kho để đẩy lên GitHub. Mỗi máy kéo bản mới về, mở sổ tay để hợp nhất: lớp theo lần lưu lớp mới hơn, đề xuất, kỳ thi, thông báo và tài khoản gộp theo mã. Tài khoản lấy bản mới hơn và không thay mật khẩu đang có bằng mật khẩu trống. App ghi ocean-edu-classes.json và ocean-edu-data.json vào thư mục đã chọn. Người sửa rồi commit và push. GitHub chỉ phục vụ file, không ghi ngược khi máy khác đang mở.</p>' +
       '<div class="btn-row"><button type="button" class="btn btn-primary" data-act="download-classes">Tải ocean-edu-classes.json</button>' +
       '<button type="button" class="btn" data-act="download-data">Tải ocean-edu-data.json</button>' +
       '<button type="button" class="btn" data-act="pick-folder">Chọn thư mục Index</button></div>';
@@ -4439,21 +5269,29 @@
         '<option value="guest"' + (role === 'guest' ? ' selected' : '') + '>Guest (xanh biển)</option></select></label>' +
         '<div id="acc-perm-wrap" class="perm-box"' + (role === 'admin' ? ' hidden' : '') + '>' +
         '<p class="field-label">Quyền bật / tắt</p>' +
-        '<label class="checkline"><input type="checkbox" id="perm-classes"' + (perms.exportClasses ? ' checked' : '') + '> Quyền xuất file trên danh sách lớp</label>' +
-        '<label class="checkline"><input type="checkbox" id="perm-homework"' + (perms.exportHomework ? ' checked' : '') + '> Quyền xuất file trên danh sách chuyên cần</label>' +
-        '<label class="checkline"><input type="checkbox" id="perm-suggest"' + (perms.suggest ? ' checked' : '') + '> Quyền comment, nhắn tin đề xuất ở Mục D</label></div>' +
+        '<label class="checkline"><input type="checkbox" id="perm-suggest"' + (perms.suggest ? ' checked' : '') + '> Quyền đề xuất từ Mục D</label>' +
+        '<label class="checkline"><input type="checkbox" id="perm-student"' + (perms.studentOps ? ' checked' : '') + '> Quyền thao tác chuyển lớp, xóa học viên</label>' +
+        '<label class="checkline"><input type="checkbox" id="perm-class"' + (perms.classOps ? ' checked' : '') + '> Quyền thay đổi thông tin lớp, xóa lớp</label>' +
+        '<label class="checkline"><input type="checkbox" id="perm-schedule"' + (perms.scheduleOps ? ' checked' : '') + '> Quyền hủy lịch, đổi lịch</label>' +
+        '<label class="checkline"><input type="checkbox" id="perm-feed"' + (perms.staffFeed ? ' checked' : '') + '> Nhận thông tin thao tác của các nhân sự khác</label>' +
+        '<label class="checkline"><input type="checkbox" id="perm-exam"' + (perms.examOps ? ' checked' : '') + '> Tạo lịch, tổ chức buổi thi ở Mục G</label></div>' +
         '<label class="field" id="acc-pass-wrap"' + (role === 'guest' ? ' hidden' : '') + '><span>Mật khẩu' + (editing ? ' — gõ mật khẩu mới, để trống nếu giữ mật khẩu đang dùng' : ' — gõ mật khẩu dùng để đăng nhập') + '</span><input id="acc-pass" type="password" autocomplete="off" readonly spellcheck="false"></label>' +
         '<div class="btn-row"><button type="submit" class="btn btn-primary">Lưu tài khoản</button><button type="button" class="btn" data-act="cancel-account">Hủy</button></div></form>';
     }
-    panel.innerHTML = '<h3>Quản lý tài khoản</h3><p class="help">Admin sửa tài khoản của mình, thêm, xóa và phân bậc tài khoản khác. Với Commenter và Guest, bật hoặc tắt từng quyền. Các việc không được bật (sửa lớp, học viên, tài khoản, đăng thông báo, đổi buổi) chỉ Admin làm được. Commenter vẫn đánh dấu chuyên cần. Chọn Guest thì không nhập mật khẩu.</p>' +
+    panel.innerHTML = '<h3>Quản lý tài khoản</h3><p class="help">Admin sửa tài khoản của mình, thêm, xóa và phân bậc tài khoản khác. Với Commenter và Guest, bật hoặc tắt từng quyền bên dưới. Việc không được bật thì tài khoản đó không làm được. Commenter vẫn đánh dấu chuyên cần. In và xuất file chỉ Admin. Chọn Guest thì không nhập mật khẩu.</p>' +
       rows + (ui.accountForm ? '' : '<button type="button" class="btn btn-primary" data-act="new-account">+ Tạo tài khoản</button>') + form;
   }
 
   function permBits(acc) {
     var perms = accountPerms(acc);
-    return (perms.exportClasses ? 'Xuất lớp: bật' : 'Xuất lớp: tắt') + ' · ' +
-      (perms.exportHomework ? 'Xuất chuyên cần: bật' : 'Xuất chuyên cần: tắt') + ' · ' +
-      (perms.suggest ? 'Đề xuất: bật' : 'Đề xuất: tắt');
+    var bits = [];
+    if (perms.suggest) bits.push('Đề xuất');
+    if (perms.studentOps) bits.push('Học viên');
+    if (perms.classOps) bits.push('Lớp');
+    if (perms.scheduleOps) bits.push('Lịch');
+    if (perms.staffFeed) bits.push('Theo dõi');
+    if (perms.examOps) bits.push('Thi');
+    return bits.length ? bits.join(' · ') : 'Không bật quyền';
   }
 
   function saveAccountForm(event) {
@@ -4480,10 +5318,17 @@
     if (role !== 'guest' && !nextPassword) { toast('Admin và Commenter cần mật khẩu.'); return; }
     var perms = null;
     if (role !== 'admin') {
+      function permOn(id) {
+        var box = document.getElementById(id);
+        return !!(box && box.checked);
+      }
       perms = {
-        exportClasses: !!(document.getElementById('perm-classes') && document.getElementById('perm-classes').checked),
-        exportHomework: !!(document.getElementById('perm-homework') && document.getElementById('perm-homework').checked),
-        suggest: !!(document.getElementById('perm-suggest') && document.getElementById('perm-suggest').checked)
+        suggest: permOn('perm-suggest'),
+        studentOps: permOn('perm-student'),
+        classOps: permOn('perm-class'),
+        scheduleOps: permOn('perm-schedule'),
+        staffFeed: permOn('perm-feed'),
+        examOps: permOn('perm-exam')
       };
     }
     var wasSelf = !!(editing && ui.user && ui.user.username === editing.username);
@@ -4541,31 +5386,127 @@
     if (!btn) return;
     var act = btn.getAttribute('data-act');
     var adminOnly = {
-      'open-add-class': 1, 'edit-class': 1, 'open-add-student': 1, 'open-import': 1, 'download-template': 1,
+      'open-add-class': 1, 'open-add-student': 1, 'open-import': 1, 'download-template': 1,
       'run-import': 1, 'edit-student': 1, 'edit-detail': 1, 'save-detail': 1, 'add-note': 1, 'remove-note': 1,
-      'bulk-transfer': 1, 'confirm-transfer': 1, 'bulk-expire': 1, 'do-expire': 1, 'bulk-delete': 1, 'do-bulk-delete': 1,
-      'delete-one': 1, 'do-delete-one': 1, 'delete-class': 1, 'do-delete-class': 1, 'resume-student': 1,
+      'bulk-expire': 1, 'do-expire': 1, 'resume-student': 1,
       'archive-purge': 1, 'do-archive-purge': 1, 'rejoin-pick': 1,
-      'exam-create': 1, 'exam-next': 1, 'exam-back': 1, 'exam-cancel': 1, 'exam-commit': 1, 'exam-extra-pick': 1,
-      'exam-day': 1, 'exam-cal': 1, 'transfer-pick': 1,
       'new-account': 1, 'edit-account': 1, 'delete-account': 1,
       'download-data': 1, 'download-classes': 1, 'pick-folder': 1,
-      'drop-image': 1, 'schedule-pick': 1, 'open-soa': 1, 'soa-drop': 1
+      'drop-image': 1, 'open-soa': 1, 'soa-drop': 1
+    };
+    var studentActs = {
+      'bulk-transfer': 1, 'confirm-transfer': 1, 'transfer-pick': 1,
+      'bulk-delete': 1, 'do-bulk-delete': 1, 'delete-one': 1, 'do-delete-one': 1
+    };
+    var classActs = { 'edit-class': 1, 'delete-class': 1, 'do-delete-class': 1 };
+    var examActs = {
+      'exam-create': 1, 'exam-next': 1, 'exam-back': 1, 'exam-cancel': 1, 'exam-commit': 1,
+      'exam-extra-pick': 1, 'exam-day': 1, 'exam-cal': 1
     };
     if (adminOnly[act] && deny(canEdit())) return;
+    if (studentActs[act] && deny(canStudentOps())) return;
+    if (classActs[act] && deny(canClassOps())) return;
+    if (examActs[act] && deny(canExamOps())) return;
     if ((act === 'hw-cell' || act === 'hw-set') && deny(canMark())) return;
     if (act === 'export-schedule' && deny(canExportClasses())) return;
     if (act === 'export-classes' && deny(canExportClasses())) return;
     if (act === 'print-students' && deny(canExportClasses())) return;
     if (act === 'export-homework' && deny(canExportHomework())) return;
-    if ((act === 'suggest-open' || act === 'suggest-send') && deny(canSuggest())) return;
-    if ((act === 'move-session' || act === 'save-move') && deny(canEdit())) return;
+    if ((act === 'suggest-open' || act === 'suggest-send' || act === 'suggest-class' || act === 'suggest-student') && deny(canSuggest())) return;
+    if (act === 'schedule-pick' && deny(canScheduleOps() || canClassOps())) return;
+    if ((act === 'move-session' || act === 'save-move') && deny(canScheduleOps())) return;
+    if (act === 'save-session-fet' && deny(canClassOps())) return;
     if (act === 'open-clock') { document.getElementById('clockbox').classList.remove('hidden'); paintClock(); return; }
     if (act === 'close-clock') { document.getElementById('clockbox').classList.add('hidden'); return; }
     if (act === 'open-settings') { openSettings(); return; }
     if (act === 'close-settings') { closeSettings(); return; }
     if (act === 'set-theme') { applyTheme(btn.getAttribute('data-theme')); return; }
     if (act === 'set-primary') { applyPrimary(btn.getAttribute('data-primary')); return; }
+    if (act === 'set-skin') { applySkin(btn.getAttribute('data-skin')); return; }
+    if (act === 'gate-confirm') { confirmGate(btn.getAttribute('data-id')); return; }
+    if (act === 'gate-confirm-old') { confirmOldGate(); return; }
+    if (act === 'mail-toggle') {
+      var mailPanel = document.getElementById('mailbox');
+      if (!mailPanel) return;
+      var opening = mailPanel.classList.contains('hidden');
+      mailPanel.classList.toggle('hidden', !opening);
+      if (opening) {
+        if (!ui.mailMonth) ui.mailMonth = L.monthKey(new Date());
+        paintMail();
+      }
+      return;
+    }
+    if (act === 'mail-close') {
+      var mailClose = document.getElementById('mailbox');
+      if (mailClose) mailClose.classList.add('hidden');
+      return;
+    }
+    if (act === 'mail-open') {
+      ui.mailId = btn.getAttribute('data-id') || '';
+      ui.rejectId = '';
+      var mailOpen = document.getElementById('mailbox');
+      if (mailOpen) mailOpen.classList.remove('hidden');
+      paintMail();
+      return;
+    }
+    if (act === 'missed-show') {
+      var missedCard = document.getElementById('missed-card');
+      if (missedCard) missedCard.classList.remove('hidden');
+      if (ui.missedAt < 0) ui.missedAt = 0;
+      paintMissedCard();
+      return;
+    }
+    if (act === 'missed-next') {
+      var missedRows = missedTasks(new Date());
+      if (!missedRows.length) { paintMissed(); return; }
+      ui.missedAt = (ui.missedAt + 1) % missedRows.length;
+      paintMissedCard(missedRows);
+      return;
+    }
+    if (act === 'missed-open') {
+      var missedList = missedTasks(new Date());
+      var missedTask = missedList[ui.missedAt] || missedList[0];
+      if (!missedTask) return;
+      ui.mailId = missedTask.id;
+      ui.mailMonth = missedTask.month || String(missedTask.createdAt || '').slice(0, 7);
+      ui.rejectId = '';
+      var missedMail = document.getElementById('mailbox');
+      if (missedMail) missedMail.classList.remove('hidden');
+      paintMail();
+      return;
+    }
+    if (act === 'open-notices') {
+      ui.noticeMonth = ui.boardMonth || L.monthKey(new Date());
+      var notice = document.getElementById('noticebox');
+      if (notice) notice.classList.remove('hidden');
+      paintNotices();
+      return;
+    }
+    if (act === 'notice-close') {
+      var noticeClose = document.getElementById('noticebox');
+      if (noticeClose) noticeClose.classList.add('hidden');
+      return;
+    }
+    if (act === 'task-do') { performTask(btn.getAttribute('data-id')); return; }
+    if (act === 'task-reject') { ui.rejectId = btn.getAttribute('data-id') || ''; paintMail(); return; }
+    if (act === 'task-reject-cancel') { ui.rejectId = ''; paintMail(); return; }
+    if (act === 'task-reject-send') {
+      var rejectBox = document.getElementById('reject-reason');
+      rejectTask(btn.getAttribute('data-id'), rejectBox ? rejectBox.value : '');
+      return;
+    }
+    if (act === 'suggest-class') {
+      readSuggestDraft();
+      ui.suggest.classId = btn.getAttribute('data-id') || '';
+      render();
+      return;
+    }
+    if (act === 'suggest-student') {
+      readSuggestDraft();
+      ui.suggest.studentId = btn.getAttribute('data-id') || '';
+      render();
+      return;
+    }
     if (act === 'logout') {
       ui.user = null;
       ui.screen = 'login';
@@ -4654,11 +5595,17 @@
       return;
     }
     if (act === 'save-move') { saveMove(); return; }
+    if (act === 'save-session-fet') { saveSessionFet(); return; }
     if (act === 'export-classes') { exportClasses(btn.getAttribute('data-kind')); return; }
     if (act === 'print-students') { printStudents(); return; }
-    if (act === 'suggest-open') { ui.formError = ''; ui.modal = { type: 'suggest' }; render(); return; }
+    if (act === 'suggest-open') {
+      ui.formError = '';
+      ui.suggest = { type: 'transfer' };
+      ui.modal = { type: 'suggest' };
+      render();
+      return;
+    }
     if (act === 'suggest-send') { sendSuggestion(); return; }
-    if (act === 'request-update') { requestUpdate(); return; }
     if (act === 'drop-image') {
       var postBox = document.getElementById('post-text');
       ui.postDraft = postBox ? postBox.value : ui.postDraft;
@@ -5166,18 +6113,44 @@
       render();
       return;
     }
+    if (t.id === 'suggest-type') {
+      readSuggestDraft();
+      ui.suggest.type = t.value || 'transfer';
+      ui.suggest.to = '';
+      ui.suggest.classId = '';
+      render();
+      return;
+    }
+    if (t.id === 'mail-month') {
+      ui.mailMonth = t.value || L.monthKey(new Date());
+      ui.mailId = '';
+      ui.rejectId = '';
+      paintMail();
+      return;
+    }
+    if (t.id === 'notice-month') {
+      ui.noticeMonth = t.value || L.monthKey(new Date());
+      paintNotices();
+      return;
+    }
     if (t.id === 'acc-role') {
       var wrap = document.getElementById('acc-pass-wrap');
       if (wrap) wrap.hidden = t.value === 'guest';
       var permWrap = document.getElementById('acc-perm-wrap');
       if (permWrap) permWrap.hidden = t.value === 'admin';
       var defaults = defaultPerms(t.value);
-      var classesBox = document.getElementById('perm-classes');
-      var homeworkBox = document.getElementById('perm-homework');
-      var suggestBox = document.getElementById('perm-suggest');
-      if (classesBox) classesBox.checked = defaults.exportClasses;
-      if (homeworkBox) homeworkBox.checked = defaults.exportHomework;
-      if (suggestBox) suggestBox.checked = defaults.suggest;
+      var permMap = {
+        'perm-suggest': defaults.suggest,
+        'perm-student': defaults.studentOps,
+        'perm-class': defaults.classOps,
+        'perm-schedule': defaults.scheduleOps,
+        'perm-feed': defaults.staffFeed,
+        'perm-exam': defaults.examOps
+      };
+      Object.keys(permMap).forEach(function (id) {
+        var box = document.getElementById(id);
+        if (box) box.checked = !!permMap[id];
+      });
       if (ui.accountForm) ui.accountForm.role = t.value;
       return;
     }
@@ -5289,6 +6262,19 @@
       });
       return;
     }
+    if (e.target.id === 'suggest-q') {
+      var suggestStart = e.target.selectionStart;
+      var suggestEnd = e.target.selectionEnd;
+      readSuggestDraft();
+      ui.suggest.query = e.target.value;
+      render();
+      var suggestBox = document.getElementById('suggest-q');
+      if (suggestBox) {
+        suggestBox.focus();
+        if (suggestStart != null && suggestBox.setSelectionRange) suggestBox.setSelectionRange(suggestStart, suggestEnd);
+      }
+      return;
+    }
     if (e.target.id === 'transfer-q') {
       var transferQuery = String(e.target.value || '').trim().toLowerCase();
       document.querySelectorAll('#transfer-picks .pick-opt').forEach(function (el) {
@@ -5347,6 +6333,8 @@
         save();
         return result;
       }).then(function (result) {
+        paintGate();
+        playUnseenActivity();
         if (result && result.promoted.length) toast(result.promoted.length + ' lớp vừa lên cấp. Xem bảng thông báo tháng.');
         else if (result && result.finished && result.finished.length) toast(result.finished.length + ' lớp custom đã kết thúc và không lên trình độ.');
         else if (result && result.archived && result.archived.length) toast(result.archived.length + ' học viên đã chuyển vào Học viên cũ/kết thúc.');
@@ -5395,6 +6383,8 @@
 
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
+    var gateBox = document.getElementById('gatebox');
+    if (gateBox && !gateBox.classList.contains('hidden')) return;
     var previewBox = document.getElementById('previewbox');
     if (previewBox && !previewBox.classList.contains('hidden')) { closePreview(); return; }
     if (!document.getElementById('clockbox').classList.contains('hidden')) {
@@ -5496,6 +6486,9 @@
           var result = L.runSystemUpdate(state, new Date());
           var changed = result.promoted.length || result.notesCleared || result.ending || (result.finished && result.finished.length) || (result.archived && result.archived.length);
           if (persistBook || changed) save(persistBook && !changed ? { keepStamp: true, quiet: true } : { quiet: true });
+        }).then(function () {
+          paintGate();
+          playUnseenActivity();
         });
         return;
       }

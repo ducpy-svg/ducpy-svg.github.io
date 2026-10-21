@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="vi" data-theme="day" data-primary="ocean">
+<html lang="vi" data-theme="day" data-primary="ocean" data-skin="default">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Ocean EDU - Student management list (Unofficial) ver 1.3.7</title>
+  <title>Ocean EDU - Student management list (Unofficial) ver 1.3.8</title>
   <link rel="icon" href="Token.png">
   <link rel="stylesheet" href="styles.css">
   <script>
@@ -11,9 +11,23 @@
       var saved = JSON.parse(localStorage.getItem('oceanEdu.v1') || '{}');
       var theme = saved.settings && saved.settings.theme === 'night' ? 'night' : 'day';
       var primaries = ['ocean', 'sky', 'teal', 'green', 'lime', 'amber', 'orange', 'coral', 'rose', 'violet', 'indigo', 'slate'];
+      var skins = ['default', 'y2k', 'mcbling', 'indie', 'aero', 'minimal'];
       var primary = saved.settings && primaries.indexOf(saved.settings.primary) >= 0 ? saved.settings.primary : 'ocean';
+      var skin = 'default';
+      var who = JSON.parse(sessionStorage.getItem('oceanEduUser') || 'null');
+      var accounts = saved.accounts || [];
+      for (var i = 0; i < accounts.length; i++) {
+        var look = who && accounts[i].username === who.username ? accounts[i].appearance : null;
+        if (!look || skins.indexOf(look.skin) < 0) continue;
+        skin = look.skin;
+        if (skin === 'default') {
+          if (look.theme === 'night' || look.theme === 'day') theme = look.theme;
+          if (primaries.indexOf(look.primary) >= 0) primary = look.primary;
+        }
+      }
       document.documentElement.setAttribute('data-theme', theme);
       document.documentElement.setAttribute('data-primary', primary);
+      document.documentElement.setAttribute('data-skin', skin);
     } catch (e) {}
   </script>
 </head>
@@ -55,6 +69,12 @@
   <div id="print-root"></div>
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+  <button type="button" id="mail-btn" class="corner-btn mail-btn hidden" data-act="mail-toggle">Task mail</button>
+  <div id="mailbox" class="mailbox hidden" role="dialog" aria-label="Task mail"></div>
+  <button type="button" id="missed-btn" class="corner-btn missed-btn hidden" data-act="missed-show">Bạn bị nhỡ</button>
+  <div id="missed-card" class="missed-card hidden" role="status"></div>
+  <div id="noticebox" class="dialog hidden" role="dialog" aria-modal="true" aria-label="Thông báo data"></div>
+  <div id="gatebox" class="gatebox hidden" role="dialog" aria-modal="true" aria-label="Việc cần xác nhận"></div>
 
   <div id="clockbox" class="dialog hidden" role="dialog" aria-modal="true" aria-labelledby="clock-heading">
     <div class="dialog-card" data-stop>
@@ -76,6 +96,17 @@
           <h2 id="settings-heading">Cài đặt</h2>
           <button type="button" class="icon-x" data-act="close-settings" aria-label="Đóng">X</button>
         </div>
+        <p class="field-label">Giao diện</p>
+        <div class="skin-grid">
+          <button type="button" data-act="set-skin" data-skin="default" data-skin-btn>Default</button>
+          <button type="button" data-act="set-skin" data-skin="y2k" data-skin-btn>Y2K</button>
+          <button type="button" data-act="set-skin" data-skin="mcbling" data-skin-btn>McBling</button>
+          <button type="button" data-act="set-skin" data-skin="indie" data-skin-btn>Indie Sleaze</button>
+          <button type="button" data-act="set-skin" data-skin="aero" data-skin-btn>Frutiger Aero</button>
+          <button type="button" data-act="set-skin" data-skin="minimal" data-skin-btn>Minimalist</button>
+        </div>
+        <p class="help">Mỗi giao diện có một kiểu hoạt ảnh. Màu ban ngày, ban đêm và 12 màu chính chỉ dùng cho Default.</p>
+        <div id="default-look">
         <p class="field-label">Màu giao diện</p>
         <div class="theme-switch">
           <button type="button" data-act="set-theme" data-theme="day" data-theme-btn>Ban ngày</button>
@@ -96,7 +127,8 @@
           <button type="button" data-act="set-primary" data-primary="indigo" data-primary-btn style="--swatch:#4338ca">Chàm</button>
           <button type="button" data-act="set-primary" data-primary="slate" data-primary-btn style="--swatch:#334155">Xám xanh</button>
         </div>
-        <p class="help">12 màu chính cho nút, tiêu đề bảng và sóng. Ban ngày hoặc ban đêm giữ nền sáng hoặc tối.</p>
+        <p class="help">12 màu chính cho nút, tiêu đề bảng và sóng của giao diện Default. Ban ngày hoặc ban đêm giữ nền sáng hoặc tối.</p>
+        </div>
         <label class="field">
           <span>Tiêu đề</span>
           <input id="setting-title" type="text" maxlength="120" required>
