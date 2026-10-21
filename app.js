@@ -2,7 +2,7 @@
   'use strict';
 
   var L = window.OceanLogic;
-  var APP_TITLE = 'Ocean EDU - Student management list (Unofficial) ver 1.3.8';
+  var APP_TITLE = 'Ocean EDU - Student management list (Unofficial) ver 1.3.9';
   var PRIMARY_IDS = ['ocean', 'sky', 'teal', 'green', 'lime', 'amber', 'orange', 'coral', 'rose', 'violet', 'indigo', 'slate'];
   var SKIN_IDS = ['default', 'y2k', 'mcbling', 'indie', 'aero', 'minimal'];
   var STORAGE = 'oceanEdu.v1';
@@ -87,6 +87,8 @@
   var preview = { scale: 1, x: 0, y: 0, pointers: {}, lastDist: 0 };
   var localRaw = {};
   var savePaused = true;
+  var socketMute = false;
+  var oceanLiveBound = false;
   var persistBook = false;
   var dataNote = 'Chưa đọc file data trên bản web.';
   var classNote = 'Chưa đọc file lớp, học viên và chuyên cần.';
@@ -126,6 +128,19 @@
     return savedTime(incoming) > savedTime(current);
   }
 
+  function cleanSupabaseUrl(value) {
+    var url = String(value || '').trim().replace(/\/+$/, '');
+    if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url)) return '';
+    return url;
+  }
+
+  function cleanSupabaseKey(value) {
+    var key = String(value || '').trim();
+    if (key.length < 20 || key.length > 400) return '';
+    if (!/^[\w.\-]+$/.test(key)) return '';
+    return key;
+  }
+
   function applyRaw(raw) {
     raw = raw && typeof raw === 'object' ? raw : {};
     try {
@@ -150,10 +165,20 @@
         'Ocean EDU - Student management list (Unofficial) ver 1.3.4',
         'Ocean EDU - Student management list (Unofficial) ver 1.3.5',
         'Ocean EDU - Student management list (Unofficial) ver 1.3.6',
-        'Ocean EDU - Student management list (Unofficial) ver 1.3.7'
+        'Ocean EDU - Student management list (Unofficial) ver 1.3.7',
+        'Ocean EDU - Student management list (Unofficial) ver 1.3.8'
       ];
       if (!state.settings.title || legacyTitle.indexOf(state.settings.title) >= 0) state.settings.title = APP_TITLE;
       delete state.settings.scriptUrl;
+      var liveUrl = cleanSupabaseUrl(state.settings.supabaseUrl);
+      var liveKey = cleanSupabaseKey(state.settings.supabaseKey);
+      if (liveUrl && liveKey) {
+        state.settings.supabaseUrl = liveUrl;
+        state.settings.supabaseKey = liveKey;
+      } else {
+        delete state.settings.supabaseUrl;
+        delete state.settings.supabaseKey;
+      }
       if (state.settings.theme !== 'night') state.settings.theme = 'day';
       if (PRIMARY_IDS.indexOf(state.settings.primary) < 0) state.settings.primary = 'ocean';
       state.classes = normalizeClasses(raw.classes);
@@ -854,7 +879,56 @@
         toast('Đã lưu trên trình duyệt. Chưa ghi được file JSON trong thư mục. Hãy chọn thư mục Index một lần để lần sau ghi thẳng và hiện confirmed.');
       }
     });
+    if (!(options && options.keepStamp) && !socketMute && window.OceanLive) window.OceanLive.push(dataJson);
     return true;
+  }
+
+  function connectSocket() {
+    if (!window.OceanLive) return;
+    window.OceanLive.connect(state.settings.supabaseUrl || '', state.settings.supabaseKey || '');
+  }
+
+  function applySocketBook(file) {
+    if (!file || typeof file !== 'object' || !file.settings) return;
+    socketMute = true;
+    try {
+      var newer = shareStamp(file) > (Date.parse(state.settings.savedAt || '') || 0);
+      absorbShare(file);
+      if (Array.isArray(file.announcements)) {
+        state.announcements = L.mergeById(state.announcements || [], file.announcements, newer);
+      }
+      var incoming = Array.isArray(file.classes) ? file.classes : null;
+      var stamp = file.settings.classesSavedAt || '';
+      var incomingStamp = Date.parse(stamp) || 0;
+      if (incoming && classListScore(incoming) > 0 && (classListScore(state.classes) <= 0 || incomingStamp > classStamp(state.settings))) {
+        state.classes = normalizeClasses(incoming);
+        if (stamp) state.settings.classesSavedAt = stamp;
+        lastClassJson = JSON.stringify(state.classes);
+      }
+      sealShare();
+      var remoteUrl = cleanSupabaseUrl(file.settings.supabaseUrl);
+      var remoteKey = cleanSupabaseKey(file.settings.supabaseKey);
+      if (remoteUrl && remoteKey && !state.settings.supabaseUrl) {
+        state.settings.supabaseUrl = remoteUrl;
+        state.settings.supabaseKey = remoteKey;
+      }
+      save({ quiet: true, keepStamp: true });
+    } finally {
+      socketMute = false;
+    }
+    if (busy()) {
+      ui.pendingUpdate = true;
+      toast('Có sổ mới từ máy khác. Dữ liệu sẽ làm mới khi đóng cửa sổ.');
+      return;
+    }
+    render();
+    toast('Đã nhận sổ từ máy khác.');
+  }
+
+  function bindOceanLive() {
+    if (oceanLiveBound || !window.OceanLive) return;
+    oceanLiveBound = true;
+    window.OceanLive.onBook(applySocketBook);
   }
 
   function roleKey() {
@@ -4338,6 +4412,27 @@
     title.disabled = !canEdit();
     var saveBtn = document.querySelector('#settings-form [type="submit"]');
     if (saveBtn) saveBtn.hidden = !canEdit();
+    var urlBox = document.getElementById('supabase-url');
+    var keyBox = document.getElementById('supabase-key');
+    if (urlBox) {
+      urlBox.value = state.settings.supabaseUrl || '';
+      urlBox.disabled = !canEdit();
+    }
+    if (keyBox) {
+      keyBox.value = state.settings.supabaseKey || '';
+      keyBox.disabled = !canEdit();
+    }
+    var socketStatus = document.getElementById('socket-status');
+    if (socketStatus) {
+      var liveState = window.OceanLive ? window.OceanLive.status() : 'off';
+      var liveText = {
+        off: 'Socket đang tắt.',
+        wait: 'Đang nối socket.',
+        on: 'Socket đã nối phòng ocean-edu.',
+        error: 'Socket chưa nối được. Kiểm tra URL, anon key và Realtime.'
+      };
+      socketStatus.textContent = liveText[liveState] || liveText.off;
+    }
     document.getElementById('settingsbox').classList.remove('hidden');
     paintThemeButtons();
     paintAccounts();
@@ -5201,6 +5296,7 @@
       '<p class="help">' + esc(classNote) + '</p>' +
       '<p class="help">' + esc(dataNote) + '</p>' +
       '<p class="help">Thư mục Index trên ổ D là kho để đẩy lên GitHub. Mỗi máy kéo bản mới về, mở sổ tay để hợp nhất: lớp theo lần lưu lớp mới hơn, đề xuất, kỳ thi, thông báo và tài khoản gộp theo mã. Tài khoản lấy bản mới hơn và không thay mật khẩu đang có bằng mật khẩu trống. App ghi ocean-edu-classes.json và ocean-edu-data.json vào thư mục đã chọn. Người sửa rồi commit và push. GitHub chỉ phục vụ file, không ghi ngược khi máy khác đang mở.</p>' +
+      '<p class="help">Socket Supabase dùng phòng ocean-edu. Máy nào đang nối sẽ nhận sổ ngay khi máy khác lưu, rồi gộp theo mã. Lớp lấy theo lần lưu lớp mới hơn.</p>' +
       '<div class="btn-row"><button type="button" class="btn btn-primary" data-act="download-classes">Tải ocean-edu-classes.json</button>' +
       '<button type="button" class="btn" data-act="download-data">Tải ocean-edu-data.json</button>' +
       '<button type="button" class="btn" data-act="pick-folder">Chọn thư mục Index</button></div>';
@@ -6346,9 +6442,27 @@
       if (deny(canEdit())) return;
       var title = document.getElementById('setting-title').value.trim();
       if (!title) return;
+      var urlInput = document.getElementById('supabase-url');
+      var keyInput = document.getElementById('supabase-key');
+      var rawUrl = urlInput ? urlInput.value.trim() : '';
+      var rawKey = keyInput ? keyInput.value.trim() : '';
+      var nextUrl = cleanSupabaseUrl(rawUrl);
+      var nextKey = cleanSupabaseKey(rawKey);
+      if ((rawUrl || rawKey) && (!nextUrl || !nextKey)) {
+        toast('URL Supabase hoặc anon key chưa đúng.');
+        return;
+      }
       state.settings.title = title;
+      if (nextUrl && nextKey) {
+        state.settings.supabaseUrl = nextUrl;
+        state.settings.supabaseKey = nextKey;
+      } else {
+        delete state.settings.supabaseUrl;
+        delete state.settings.supabaseKey;
+      }
       save();
       paintTitles();
+      connectSocket();
       closeSettings();
       toast('Đã lưu cài đặt.');
       return;
@@ -6473,6 +6587,7 @@
   function finishBoot() {
     applyTheme(state.settings.theme);
     savePaused = false;
+    bindOceanLive();
     var loader = document.getElementById('loader');
     try {
       var savedUser = JSON.parse(sessionStorage.getItem('oceanEduUser') || 'null');
@@ -6489,6 +6604,7 @@
         }).then(function () {
           paintGate();
           playUnseenActivity();
+          connectSocket();
         });
         return;
       }
@@ -6496,6 +6612,7 @@
     if (persistBook) save({ keepStamp: true, quiet: true });
     if (loader) loader.classList.add('hidden');
     render();
+    connectSocket();
   }
 
   function frameLabel(frame) {
