@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Ocean EDU - Student management list (Unofficial) ver 1.3.9</title>
+  <title>Ocean EDU - Student management list (Unofficial) ver 1.4.0</title>
   <link rel="icon" href="Token.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -72,11 +72,6 @@
   <div id="print-root"></div>
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
-  <button type="button" id="mail-btn" class="corner-btn mail-btn hidden" data-act="mail-toggle">Task mail</button>
-  <span id="socket-dot" class="socket-dot is-off" title="Chưa cấu hình Supabase"></span>
-  <div id="mailbox" class="mailbox hidden" role="dialog" aria-label="Task mail"></div>
-  <button type="button" id="missed-btn" class="corner-btn missed-btn hidden" data-act="missed-show">Bạn bị nhỡ</button>
-  <div id="missed-card" class="missed-card hidden" role="status"></div>
   <div id="noticebox" class="dialog hidden" role="dialog" aria-modal="true" aria-label="Thông báo data"></div>
   <div id="gatebox" class="gatebox hidden" role="dialog" aria-modal="true" aria-label="Việc cần xác nhận"></div>
 
@@ -137,17 +132,6 @@
           <span>Tiêu đề</span>
           <input id="setting-title" type="text" maxlength="120" required>
         </label>
-        <p class="field-label">Supabase realtime</p>
-        <label class="field">
-          <span>Project URL</span>
-          <input id="supabase-url" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://xxxx.supabase.co">
-        </label>
-        <label class="field">
-          <span>Anon key</span>
-          <input id="supabase-key" type="password" autocomplete="off" spellcheck="false">
-        </label>
-        <p class="help">Kênh ocean-edu phát sổ tay mỗi lần lưu. Dán URL và anon key. Để trống nếu chỉ dùng file trên máy. Không dán service_role.</p>
-        <p id="socket-status" class="help"></p>
         <div class="modal-foot">
           <button type="submit" class="btn btn-primary">Lưu</button>
           <button type="button" class="btn" data-act="close-settings">Đóng</button>
@@ -171,154 +155,6 @@
 
   <div id="app"></div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script>
-    (function () {
-      var CHUNK = 48000;
-      var channel = null;
-      var client = null;
-      var status = 'off';
-      var listeners = [];
-      var bags = {};
-      var pushTimer = null;
-      var pendingText = '';
-      var clientId = '';
-      try {
-        clientId = sessionStorage.getItem('oceanLiveId') || '';
-        if (!clientId) {
-          clientId = Math.random().toString(36).slice(2) + Date.now().toString(36);
-          sessionStorage.setItem('oceanLiveId', clientId);
-        }
-      } catch (err) {
-        clientId = Math.random().toString(36).slice(2);
-      }
-
-      function setStatus(next) {
-        status = next;
-        var dot = document.getElementById('socket-dot');
-        if (!dot) return;
-        var title = {
-          on: 'Supabase đang nối phòng ocean-edu',
-          wait: 'Đang nối Supabase',
-          error: 'Supabase chưa nối được',
-          off: 'Chưa cấu hình Supabase'
-        };
-        dot.className = 'socket-dot is-' + next;
-        dot.title = title[next] || title.off;
-      }
-
-      function splitText(text) {
-        var parts = [];
-        var i = 0;
-        var source = String(text || '');
-        while (i < source.length) {
-          parts.push(source.slice(i, i + CHUNK));
-          i += CHUNK;
-        }
-        if (!parts.length) parts.push('');
-        return parts;
-      }
-
-      function emit(file) {
-        listeners.forEach(function (fn) {
-          try { fn(file); } catch (err) {}
-        });
-      }
-
-      function takePart(payload) {
-        if (!payload || payload.from === clientId) return;
-        var id = String(payload.id || '');
-        var n = Number(payload.n) || 0;
-        var index = Number(payload.i);
-        if (!id || n < 1 || index < 0 || index >= n || typeof payload.chunk !== 'string') return;
-        var now = Date.now();
-        Object.keys(bags).forEach(function (key) {
-          if (now - bags[key].at > 20000) delete bags[key];
-        });
-        var bag = bags[id];
-        if (!bag) bag = bags[id] = { n: n, parts: [], got: 0, at: now };
-        if (bag.parts[index] == null) {
-          bag.parts[index] = payload.chunk;
-          bag.got += 1;
-        }
-        if (bag.got < bag.n) return;
-        var text = bag.parts.join('');
-        delete bags[id];
-        try { emit(JSON.parse(text)); } catch (err) {}
-      }
-
-      function flush() {
-        pushTimer = null;
-        if (!channel || status !== 'on' || !pendingText) return;
-        var parts = splitText(pendingText);
-        pendingText = '';
-        var id = clientId + '-' + Date.now().toString(36);
-        for (var i = 0; i < parts.length; i++) {
-          channel.send({
-            type: 'broadcast',
-            event: 'book',
-            payload: { id: id, i: i, n: parts.length, from: clientId, chunk: parts[i] }
-          });
-        }
-      }
-
-      function connect(nextUrl, nextKey) {
-        var url = String(nextUrl || '').trim().replace(/\/$/, '');
-        var key = String(nextKey || '').trim();
-        if (client && channel) {
-          try { client.removeChannel(channel); } catch (err) {}
-        }
-        channel = null;
-        client = null;
-        if (!url || !key || !window.supabase || !window.supabase.createClient) {
-          setStatus((url || key) ? 'error' : 'off');
-          return;
-        }
-        if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url)) {
-          setStatus('error');
-          return;
-        }
-        setStatus('wait');
-        try {
-          client = window.supabase.createClient(url, key, {
-            auth: { persistSession: false, autoRefreshToken: false }
-          });
-        } catch (err) {
-          setStatus('error');
-          return;
-        }
-        channel = client.channel('ocean-edu', { config: { broadcast: { self: false } } });
-        channel.on('broadcast', { event: 'book' }, function (response) {
-          takePart(response && response.payload);
-        });
-        channel.subscribe(function (next) {
-          if (next === 'SUBSCRIBED') {
-            setStatus('on');
-            if (pendingText) {
-              if (pushTimer) clearTimeout(pushTimer);
-              pushTimer = setTimeout(flush, 400);
-            }
-          }
-          else if (next === 'CHANNEL_ERROR' || next === 'TIMED_OUT' || next === 'CLOSED') setStatus('error');
-        });
-      }
-
-      window.OceanLive = {
-        connect: connect,
-        push: function (text) {
-          if (!text) return;
-          pendingText = String(text);
-          if (status !== 'on') return;
-          if (pushTimer) clearTimeout(pushTimer);
-          pushTimer = setTimeout(flush, 400);
-        },
-        onBook: function (fn) { if (typeof fn === 'function') listeners.push(fn); },
-        status: function () { return status; },
-        roundTrip: function (text) { return splitText(text).join(''); }
-      };
-      setStatus('off');
-    })();
-  </script>
   <script src="xlsx.full.min.js"></script>
   <script src="logic.js"></script>
   <script src="app.js"></script>

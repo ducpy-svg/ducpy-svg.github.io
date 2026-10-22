@@ -2,7 +2,8 @@
   'use strict';
 
   var L = window.OceanLogic;
-  var APP_TITLE = 'Ocean EDU - Student management list (Unofficial) ver 1.3.9';
+  var APP_TITLE = 'Ocean EDU - Student management list (Unofficial) ver 1.4.0';
+  var SUGGEST_URL = 'https://script.google.com/macros/s/AKfycbyNFHdMszhrmqyfXDHSDi2ti51y5_Ib3kiXgA5cGzcPkWLboUJSnPYJ5xwikb9N-fLOkg/exec';
   var PRIMARY_IDS = ['ocean', 'sky', 'teal', 'green', 'lime', 'amber', 'orange', 'coral', 'rose', 'violet', 'indigo', 'slate'];
   var SKIN_IDS = ['default', 'y2k', 'mcbling', 'indie', 'aero', 'minimal'];
   var STORAGE = 'oceanEdu.v1';
@@ -87,8 +88,6 @@
   var preview = { scale: 1, x: 0, y: 0, pointers: {}, lastDist: 0 };
   var localRaw = {};
   var savePaused = true;
-  var socketMute = false;
-  var oceanLiveBound = false;
   var persistBook = false;
   var dataNote = 'Chưa đọc file data trên bản web.';
   var classNote = 'Chưa đọc file lớp, học viên và chuyên cần.';
@@ -128,19 +127,6 @@
     return savedTime(incoming) > savedTime(current);
   }
 
-  function cleanSupabaseUrl(value) {
-    var url = String(value || '').trim().replace(/\/+$/, '');
-    if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url)) return '';
-    return url;
-  }
-
-  function cleanSupabaseKey(value) {
-    var key = String(value || '').trim();
-    if (key.length < 20 || key.length > 400) return '';
-    if (!/^[\w.\-]+$/.test(key)) return '';
-    return key;
-  }
-
   function applyRaw(raw) {
     raw = raw && typeof raw === 'object' ? raw : {};
     try {
@@ -166,19 +152,12 @@
         'Ocean EDU - Student management list (Unofficial) ver 1.3.5',
         'Ocean EDU - Student management list (Unofficial) ver 1.3.6',
         'Ocean EDU - Student management list (Unofficial) ver 1.3.7',
-        'Ocean EDU - Student management list (Unofficial) ver 1.3.8'
+        'Ocean EDU - Student management list (Unofficial) ver 1.3.8',
+        'Ocean EDU - Student management list (Unofficial) ver 1.3.9'
       ];
       if (!state.settings.title || legacyTitle.indexOf(state.settings.title) >= 0) state.settings.title = APP_TITLE;
-      delete state.settings.scriptUrl;
-      var liveUrl = cleanSupabaseUrl(state.settings.supabaseUrl);
-      var liveKey = cleanSupabaseKey(state.settings.supabaseKey);
-      if (liveUrl && liveKey) {
-        state.settings.supabaseUrl = liveUrl;
-        state.settings.supabaseKey = liveKey;
-      } else {
-        delete state.settings.supabaseUrl;
-        delete state.settings.supabaseKey;
-      }
+      delete state.settings.supabaseUrl;
+      delete state.settings.supabaseKey;
       if (state.settings.theme !== 'night') state.settings.theme = 'day';
       if (PRIMARY_IDS.indexOf(state.settings.primary) < 0) state.settings.primary = 'ocean';
       state.classes = normalizeClasses(raw.classes);
@@ -213,10 +192,10 @@
       staffBookSeen = !!(raw.staffBook && typeof raw.staffBook === 'object' && !Array.isArray(raw.staffBook));
       state.soaSlots = normalizeSoa(raw.soaSlots);
       soaSeen = Array.isArray(raw.soaSlots);
-      state.tasks = normalizeTasks(raw.tasks);
-      tasksSeen = Array.isArray(raw.tasks);
-      state.activity = normalizeActivity(raw.activity);
-      activitySeen = Array.isArray(raw.activity);
+      state.tasks = [];
+      tasksSeen = false;
+      state.activity = [];
+      activitySeen = false;
     } catch (err) {
       state.settings = { theme: 'day', primary: 'ocean', title: APP_TITLE };
       state.classes = [];
@@ -434,14 +413,6 @@
       state.soaSlots = L.mergeById(state.soaSlots || [], file.soaSlots, newer);
       shareSoa = true;
     }
-    if (Array.isArray(file.tasks)) {
-      state.tasks = L.mergeById(state.tasks || [], file.tasks, newer);
-      shareTasks = true;
-    }
-    if (Array.isArray(file.activity)) {
-      state.activity = L.mergeById(state.activity || [], file.activity, newer);
-      shareActivity = true;
-    }
     if (Array.isArray(file.accounts) && file.accounts.length) {
       state.accounts = mergeAccounts(state.accounts, file.accounts, newer);
     }
@@ -460,14 +431,6 @@
     if (shareSoa) {
       state.soaSlots = normalizeSoa(state.soaSlots);
       if (state.soaSlots.length) soaSeen = true;
-    }
-    if (shareTasks) {
-      state.tasks = normalizeTasks(state.tasks);
-      if (state.tasks.length) tasksSeen = true;
-    }
-    if (shareActivity) {
-      state.activity = normalizeActivity(state.activity);
-      if (state.activity.length) activitySeen = true;
     }
   }
 
@@ -625,7 +588,7 @@
         localRaw = diskData;
         applyRaw(diskData);
         persistBook = true;
-        dataNote = 'Đã đọc ocean-edu-data.json trong thư mục Index.';
+        dataNote = 'Đã đọc ocean-edu-data.json trong thư mục Index local.';
       }
       absorbShare(remote);
       absorbShare(diskData);
@@ -664,7 +627,7 @@
       if (classListScore(state.classes) <= 0) {
         classNote = 'Chưa thấy ocean-edu-classes.json cạnh index.html. File này mang lớp, học viên và chuyên cần khi đổi máy hoặc đăng lên Netlify.';
       } else {
-        classNote = 'Chưa có ocean-edu-classes.json. Hãy tải file này và chép vào thư mục Index để đồng bộ lớp, học viên và chuyên cần.';
+        classNote = 'Chưa có ocean-edu-classes.json. Hãy tải file này và chép vào thư mục Index local để đồng bộ lớp, học viên và chuyên cần.';
       }
       return;
     }
@@ -680,7 +643,7 @@
     persistBook = true;
     classAdopted = true;
     classNote = fromFolder
-      ? 'Đã đọc ocean-edu-classes.json trong thư mục Index. Lớp, học viên, chuyên cần và thông tin học viên lấy từ file này.'
+      ? 'Đã đọc ocean-edu-classes.json trong thư mục Index local. Lớp, học viên, chuyên cần và thông tin học viên lấy từ file này.'
       : 'Đã đọc ocean-edu-classes.json. Lớp, học viên và chuyên cần lấy từ file này.';
   }
 
@@ -695,8 +658,6 @@
     if (examsSeen || (state.exams && state.exams.length)) payload.exams = state.exams || [];
     if (staffBookSeen || staffBookHasData()) payload.staffBook = state.staffBook || {};
     if (soaSeen || (state.soaSlots && state.soaSlots.length)) payload.soaSlots = state.soaSlots || [];
-    if (tasksSeen || (state.tasks && state.tasks.length)) payload.tasks = state.tasks || [];
-    if (activitySeen || (state.activity && state.activity.length)) payload.activity = state.activity || [];
     return payload;
   }
 
@@ -710,8 +671,6 @@
     if (examsSeen || (state.exams && state.exams.length)) payload.exams = state.exams || [];
     if (staffBookSeen || staffBookHasData()) payload.staffBook = state.staffBook || {};
     if (soaSeen || (state.soaSlots && state.soaSlots.length)) payload.soaSlots = state.soaSlots || [];
-    if (tasksSeen || (state.tasks && state.tasks.length)) payload.tasks = state.tasks || [];
-    if (activitySeen || (state.activity && state.activity.length)) payload.activity = state.activity || [];
     return payload;
   }
 
@@ -728,15 +687,26 @@
     });
   }
 
+  function ensureFolderWrite() {
+    if (!dirHandle || !dirHandle.getFileHandle) return Promise.resolve(false);
+    if (!dirHandle.queryPermission) return Promise.resolve(true);
+    return dirHandle.queryPermission({ mode: 'readwrite' }).then(function (perm) {
+      if (perm === 'granted') return true;
+      var active = navigator.userActivation && navigator.userActivation.isActive;
+      if (perm === 'prompt' && active && dirHandle.requestPermission) {
+        return dirHandle.requestPermission({ mode: 'readwrite' }).then(function (next) {
+          return next === 'granted';
+        });
+      }
+      return false;
+    }).catch(function () { return false; });
+  }
+
   function writeNamedFile(name, json) {
     if (!dirHandle || !dirHandle.getFileHandle) return Promise.resolve(false);
-    var ask = dirHandle.queryPermission ? dirHandle.queryPermission({ mode: 'readwrite' }) : Promise.resolve('granted');
-    return ask.then(function (perm) {
-      if (perm !== 'granted') return false;
-      return dirHandle.getFileHandle(name, { create: true }).then(function (file) {
-        return file.createWritable().then(function (stream) {
-          return stream.write(json).then(function () { return stream.close(); }).then(function () { return true; });
-        });
+    return dirHandle.getFileHandle(name, { create: true }).then(function (file) {
+      return file.createWritable().then(function (stream) {
+        return stream.write(json).then(function () { return stream.close(); }).then(function () { return true; });
       });
     }).catch(function () { return false; });
   }
@@ -811,33 +781,17 @@
     box.classList.add('hidden');
   }
 
-  function beginFolderWrite() {
-    if (dirHandle) {
-      var active = navigator.userActivation && navigator.userActivation.isActive;
-      if (active && dirHandle.requestPermission) {
-        return dirHandle.requestPermission({ mode: 'readwrite' }).then(function (perm) {
-          if (perm !== 'granted') return false;
-          return writeDataFile();
-        }).catch(function () { return false; });
-      }
-      return writeDataFile();
-    }
-    var gesture = navigator.userActivation && navigator.userActivation.isActive;
-    if (!gesture || folderAsked || !window.showDirectoryPicker) return Promise.resolve(false);
-    folderAsked = true;
-    return window.showDirectoryPicker({ id: 'ocean-edu-index', mode: 'readwrite' }).then(function (handle) {
-      return rememberFolder(handle).then(function () { return writeDataFile(); });
-    }).catch(function () { return false; });
-  }
-
   var folderWrite = Promise.resolve();
   var folderSerial = 0;
 
   function writeFrozenFiles(dataJson, classFileJson) {
-    return Promise.all([
-      writeNamedFile(DATA_FILE, dataJson),
-      writeNamedFile(CLASS_FILE, classFileJson)
-    ]).then(function (flags) { return !!(flags[0] && flags[1]); });
+    return ensureFolderWrite().then(function (ok) {
+      if (!ok) return false;
+      return Promise.all([
+        writeNamedFile(DATA_FILE, dataJson),
+        writeNamedFile(CLASS_FILE, classFileJson)
+      ]).then(function (flags) { return !!(flags[0] && flags[1]); });
+    });
   }
 
   function save(options) {
@@ -876,59 +830,10 @@
       showSync('idle');
       if (!syncWarned) {
         syncWarned = true;
-        toast('Đã lưu trên trình duyệt. Chưa ghi được file JSON trong thư mục. Hãy chọn thư mục Index một lần để lần sau ghi thẳng và hiện confirmed.');
+        toast('Đã lưu trên trình duyệt. Chưa ghi được file JSON trong thư mục. Hãy chọn thư mục Index local một lần để lần sau ghi thẳng và hiện confirmed.');
       }
     });
-    if (!(options && options.keepStamp) && !socketMute && window.OceanLive) window.OceanLive.push(dataJson);
     return true;
-  }
-
-  function connectSocket() {
-    if (!window.OceanLive) return;
-    window.OceanLive.connect(state.settings.supabaseUrl || '', state.settings.supabaseKey || '');
-  }
-
-  function applySocketBook(file) {
-    if (!file || typeof file !== 'object' || !file.settings) return;
-    socketMute = true;
-    try {
-      var newer = shareStamp(file) > (Date.parse(state.settings.savedAt || '') || 0);
-      absorbShare(file);
-      if (Array.isArray(file.announcements)) {
-        state.announcements = L.mergeById(state.announcements || [], file.announcements, newer);
-      }
-      var incoming = Array.isArray(file.classes) ? file.classes : null;
-      var stamp = file.settings.classesSavedAt || '';
-      var incomingStamp = Date.parse(stamp) || 0;
-      if (incoming && classListScore(incoming) > 0 && (classListScore(state.classes) <= 0 || incomingStamp > classStamp(state.settings))) {
-        state.classes = normalizeClasses(incoming);
-        if (stamp) state.settings.classesSavedAt = stamp;
-        lastClassJson = JSON.stringify(state.classes);
-      }
-      sealShare();
-      var remoteUrl = cleanSupabaseUrl(file.settings.supabaseUrl);
-      var remoteKey = cleanSupabaseKey(file.settings.supabaseKey);
-      if (remoteUrl && remoteKey && !state.settings.supabaseUrl) {
-        state.settings.supabaseUrl = remoteUrl;
-        state.settings.supabaseKey = remoteKey;
-      }
-      save({ quiet: true, keepStamp: true });
-    } finally {
-      socketMute = false;
-    }
-    if (busy()) {
-      ui.pendingUpdate = true;
-      toast('Có sổ mới từ máy khác. Dữ liệu sẽ làm mới khi đóng cửa sổ.');
-      return;
-    }
-    render();
-    toast('Đã nhận sổ từ máy khác.');
-  }
-
-  function bindOceanLive() {
-    if (oceanLiveBound || !window.OceanLive) return;
-    oceanLiveBound = true;
-    window.OceanLive.onBook(applySocketBook);
   }
 
   function roleKey() {
@@ -942,14 +847,7 @@
 
   function defaultPerms(role) {
     var on = role === 'commenter';
-    return {
-      suggest: on,
-      studentOps: false,
-      classOps: false,
-      scheduleOps: false,
-      staffFeed: on,
-      examOps: false
-    };
+    return { exportClasses: on, exportHomework: on, suggest: on };
   }
 
   function currentAccount() {
@@ -961,35 +859,20 @@
   }
 
   function accountPerms(acc) {
-    var base = defaultPerms(acc && acc.role === 'commenter' ? 'commenter' : 'guest');
-    if (!acc) return base;
-    if (acc.role === 'admin') {
-      return { suggest: true, studentOps: true, classOps: true, scheduleOps: true, staffFeed: true, examOps: true };
-    }
+    if (!acc) return defaultPerms('guest');
+    if (acc.role === 'admin') return { exportClasses: true, exportHomework: true, suggest: true };
+    var base = defaultPerms(acc.role);
     var stored = acc.perms || {};
     return {
-      suggest: stored.suggest == null ? base.suggest : !!stored.suggest,
-      studentOps: !!stored.studentOps,
-      classOps: !!stored.classOps,
-      scheduleOps: !!stored.scheduleOps,
-      staffFeed: stored.staffFeed == null ? base.staffFeed : !!stored.staffFeed,
-      examOps: !!stored.examOps
+      exportClasses: stored.exportClasses == null ? base.exportClasses : !!stored.exportClasses,
+      exportHomework: stored.exportHomework == null ? base.exportHomework : !!stored.exportHomework,
+      suggest: stored.suggest == null ? base.suggest : !!stored.suggest
     };
   }
 
-  function hasPerm(key) {
-    var acc = currentAccount();
-    return !!(acc && accountPerms(acc)[key]);
-  }
-
-  function canExportClasses() { return canEdit(); }
-  function canExportHomework() { return canEdit(); }
-  function canSuggest() { return hasPerm('suggest'); }
-  function canStudentOps() { return hasPerm('studentOps'); }
-  function canClassOps() { return hasPerm('classOps'); }
-  function canScheduleOps() { return hasPerm('scheduleOps'); }
-  function canExamOps() { return hasPerm('examOps'); }
-  function canStaffFeed() { return hasPerm('staffFeed'); }
+  function canExportClasses() { return !!(currentAccount() && accountPerms(currentAccount()).exportClasses); }
+  function canExportHomework() { return !!(currentAccount() && accountPerms(currentAccount()).exportHomework); }
+  function canSuggest() { return !!(currentAccount() && accountPerms(currentAccount()).suggest); }
 
   function roleLabel(role) {
     if (role === 'admin') return 'ADMIN';
@@ -1233,37 +1116,9 @@
     return 'Đề xuất';
   }
 
-  function logAction(detail, aboutUser) {
-    var name = ui.user ? ui.user.name : 'Nhân sự';
-    var text = 'Nhân sự ' + name + ' đã thực hiện ' + detail;
-    var item = {
-      id: L.uid(),
-      at: new Date().toISOString(),
-      actor: name,
-      text: text,
-      aboutUser: String(aboutUser || '')
-    };
-    if (!state.activity) state.activity = [];
-    state.activity.push(item);
-    if (state.activity.length > 200) state.activity.splice(0, state.activity.length - 200);
-    activitySeen = true;
-    var acc = currentAccount();
-    if (acc) acc.activitySeen = item.at;
-    if (canStaffFeed()) enqueueToast(text, 10000);
-  }
+  function logAction() {}
 
-  function playUnseenActivity() {
-    var acc = currentAccount();
-    if (!acc) return;
-    var seen = Date.parse(acc.activitySeen || '') || 0;
-    var fresh = (state.activity || []).filter(function (item) {
-      return item && Date.parse(item.at || '') > seen && item.actor !== acc.name;
-    });
-    var about = fresh.filter(function (item) { return item.aboutUser && item.aboutUser === acc.username; });
-    var feed = canStaffFeed() ? fresh.filter(function (item) { return item.aboutUser !== acc.username; }) : [];
-    about.concat(feed).slice(-6).forEach(function (item) { enqueueToast(item.text, 10000); });
-    if (fresh.length) acc.activitySeen = fresh[fresh.length - 1].at;
-  }
+  function playUnseenActivity() {}
 
   function accountByUsername(username) {
     var key = String(username || '').trim();
@@ -1271,15 +1126,6 @@
       if (String(state.accounts[i].username || '').trim() === key) return state.accounts[i];
     }
     return null;
-  }
-
-  function suggestRecipients(type) {
-    return state.accounts.filter(function (acc) {
-      if (!acc || (ui.user && acc.username === ui.user.username)) return false;
-      var perms = accountPerms(acc);
-      if (type === 'other') return acc.role === 'admin' || perms.suggest;
-      return acc.role === 'admin' || perms.studentOps;
-    });
   }
 
   function popupItems(now) {
@@ -1342,20 +1188,6 @@
             createdAt: exam.createdAt || new Date(end.getTime() - 2 * 86400000).toISOString()
           });
         });
-      });
-    });
-    (state.tasks || []).forEach(function (task) {
-      if (!task || task.status !== 'open' || task.toUser !== acc.username) return;
-      var age = when.getTime() - new Date(task.createdAt).getTime();
-      items.push({
-        id: 'task:' + task.id,
-        kind: 'task',
-        taskId: task.id,
-        title: 'Đề xuất ' + taskTypeLabel(task.type) + ' · ' + (task.fromName || 'Nhân sự'),
-        text: task.summary || '',
-        warn: age >= 3 * 86400000,
-        until: '',
-        createdAt: task.createdAt
       });
     });
     return items.filter(function (item) {
@@ -1442,107 +1274,6 @@
     finishGateIfClear();
   }
 
-  function missedTasks(now) {
-    var acc = currentAccount();
-    if (!acc) return [];
-    var when = now || new Date();
-    return (state.tasks || []).filter(function (task) {
-      if (!task || task.status !== 'open' || task.toUser !== acc.username) return false;
-      return when.getTime() - new Date(task.createdAt).getTime() >= 2 * 86400000;
-    }).sort(function (a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); });
-  }
-
-  function paintMissed() {
-    var btn = document.getElementById('missed-btn');
-    var card = document.getElementById('missed-card');
-    if (!btn || !card) return;
-    var rows = ui.user ? missedTasks(new Date()) : [];
-    btn.classList.toggle('hidden', !rows.length);
-    btn.textContent = rows.length ? 'Bạn bị nhỡ · ' + rows.length : '';
-    if (!rows.length || ui.missedAt < 0) {
-      card.classList.add('hidden');
-      card.innerHTML = '';
-      return;
-    }
-    if (!card.classList.contains('hidden')) paintMissedCard(rows);
-  }
-
-  function paintMissedCard(rows) {
-    var card = document.getElementById('missed-card');
-    var list = rows || missedTasks(new Date());
-    if (!list.length) { card.classList.add('hidden'); return; }
-    if (ui.missedAt >= list.length) ui.missedAt = 0;
-    var task = list[ui.missedAt];
-    card.classList.remove('hidden');
-    card.innerHTML = '<p class="missed-kicker">Bạn bị nhỡ</p><h3>' + esc(taskTypeLabel(task.type)) + '</h3><p>' + esc(task.summary || '') + '</p><p class="meta">' + esc(task.fromName || '') + '</p>' +
-      '<div class="btn-row"><button type="button" class="btn" data-act="missed-next">Next</button><button type="button" class="btn btn-primary" data-act="missed-open">Xem task</button></div>';
-  }
-
-  function mailTasks() {
-    var acc = currentAccount();
-    var month = ui.mailMonth || L.monthKey(new Date());
-    return (state.tasks || []).filter(function (task) {
-      if (!task) return false;
-      var mine = !acc || acc.role === 'admin' || task.toUser === acc.username || task.fromUser === acc.username;
-      if (!mine) return false;
-      var key = task.month || String(task.createdAt || '').slice(0, 7);
-      return key === month;
-    }).sort(function (a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); });
-  }
-
-  function taskClosed(task) {
-    if (!task) return true;
-    return task.status === 'done' || task.status === 'rejected';
-  }
-
-  function paintMail() {
-    var panel = document.getElementById('mailbox');
-    var btn = document.getElementById('mail-btn');
-    if (!panel || !btn) return;
-    var openCount = (state.tasks || []).filter(function (task) {
-      var acc = currentAccount();
-      return task && task.status === 'open' && acc && task.toUser === acc.username;
-    }).length;
-    btn.classList.toggle('hidden', !ui.user);
-    btn.textContent = openCount ? 'Task mail · ' + openCount : 'Task mail';
-    if (panel.classList.contains('hidden')) return;
-    var month = ui.mailMonth || L.monthKey(new Date());
-    ui.mailMonth = month;
-    var rows = mailTasks();
-    var list = rows.map(function (task) {
-      var dim = taskClosed(task) ? ' is-dim' : '';
-      var on = ui.mailId === task.id ? ' is-on' : '';
-      return '<button type="button" class="mail-row' + dim + on + '" data-act="mail-open" data-id="' + esc(task.id) + '"><b>' + esc(taskTypeLabel(task.type)) + '</b><span>' + esc(task.summary || '') + '</span><small>' + esc(task.status === 'open' ? 'Mới' : (task.status === 'done' ? 'Đã xong' : 'Từ chối')) + '</small></button>';
-    }).join('') || '<p class="muted">Không có task trong tháng này.</p>';
-    var detail = '';
-    var task = rows.filter(function (item) { return item.id === ui.mailId; })[0];
-    if (task) detail = mailDetail(task);
-    panel.innerHTML = '<div class="mail-head"><h2>Task mail</h2><button type="button" class="icon-x" data-act="mail-close" aria-label="Đóng">X</button></div>' +
-      '<label class="field"><span>Tháng</span><input id="mail-month" type="month" value="' + esc(month) + '"></label>' +
-      '<div class="mail-list">' + list + '</div>' + detail;
-  }
-
-  function mailDetail(task) {
-    var acc = currentAccount();
-    var mine = acc && task.toUser === acc.username;
-    var closed = taskClosed(task);
-    var actions = '';
-    if (!closed && mine && ui.rejectId === task.id) {
-      actions = '<label class="field"><span>Lý do từ chối</span><textarea id="reject-reason"></textarea></label>' +
-        '<div class="btn-row"><button type="button" class="btn btn-danger" data-act="task-reject-send" data-id="' + esc(task.id) + '">Gửi từ chối</button>' +
-        '<button type="button" class="btn" data-act="task-reject-cancel">Hủy</button></div>';
-    } else if (!closed && mine && (task.type === 'other' || canStudentOps())) {
-      actions = '<div class="btn-row"><button type="button" class="btn btn-primary" data-act="task-do" data-id="' + esc(task.id) + '">Thực hiện</button>' +
-        '<button type="button" class="btn btn-danger" data-act="task-reject" data-id="' + esc(task.id) + '">Từ chối</button></div>';
-    } else if (!closed && mine) {
-      actions = '<p class="help">Tài khoản này không có quyền thực hiện đề xuất này.</p><div class="btn-row"><button type="button" class="btn btn-danger" data-act="task-reject" data-id="' + esc(task.id) + '">Từ chối</button></div>';
-    }
-    if (closed) actions = '<p class="help">Task này đã ' + (task.status === 'done' ? 'hoàn thành' : 'từ chối') + '. Chỉ xem lại.</p>';
-    var reject = task.rejectReason ? '<p>Lý do từ chối: ' + esc(task.rejectReason) + '</p>' : '';
-    return '<article class="mail-detail' + (closed ? ' is-dim' : '') + '"><h3>' + esc(taskTypeLabel(task.type)) + '</h3><p>' + esc(task.summary || '') + '</p>' +
-      '<p class="meta">Từ ' + esc(task.fromName || '—') + ' · tới ' + esc(task.toName || '—') + '</p>' + reject + actions + '</article>';
-  }
-
   function paintNotices() {
     var box = document.getElementById('noticebox');
     if (!box || box.classList.contains('hidden')) return;
@@ -1557,22 +1288,11 @@
   }
 
   function paintDesk() {
-    var signed = !!ui.user;
-    var mail = document.getElementById('mail-btn');
-    var missed = document.getElementById('missed-btn');
-    if (mail) mail.classList.toggle('hidden', !signed);
-    if (missed) missed.classList.toggle('hidden', !signed);
-    if (!signed) {
+    if (!ui.user) {
       var gate = document.getElementById('gatebox');
-      var panel = document.getElementById('mailbox');
-      var card = document.getElementById('missed-card');
       if (gate) { gate.classList.add('hidden'); gate.innerHTML = ''; }
-      if (panel) panel.classList.add('hidden');
-      if (card) card.classList.add('hidden');
       return;
     }
-    paintMail();
-    paintMissed();
     paintNotices();
     paintGateClocks();
   }
@@ -1746,7 +1466,8 @@
       var at = new Date(state.settings.savedAt);
       when = L.formatDMY(at) + ' ' + L.formatAmPm(at);
     }
-    return '<div class="savebar"><span>Data được cập nhật lần cuối: ' + esc(when) + '</span></div>';
+    return '<div class="savebar"><span>Data được cập nhật lần cuối: ' + esc(when) + '</span>' +
+      '<button type="button" class="btn btn-danger" data-act="request-update">Yêu cầu cập nhật</button></div>';
   }
 
   function currentWeekStats(filter) {
@@ -2052,7 +1773,7 @@
     }).join('') : '<p class="muted">Chưa có đợt thi.</p>';
     return shell('<div class="section-head"><div><button type="button" class="btn" data-act="nav" data-screen="menu">← Menu</button>' +
       '<h2>Kỳ thi</h2><p class="meta">Mục G</p></div><div class="btn-row">' +
-      (canExamOps() ? '<button type="button" class="btn btn-primary" data-act="exam-create">+ Tạo đợt thi</button>' : '') +
+      (canEdit() ? '<button type="button" class="btn btn-primary" data-act="exam-create">+ Tạo đợt thi</button>' : '') +
       '</div></div>' +
       '<p class="help">Mỗi đợt thi là một thư mục. Theo lớp lấy học viên chính thức và trial của các lớp được chọn. Chọn lọc thêm khoảng tuổi. Ngày thi chọn trên lịch tháng, có thể nhiều ngày. Học bổng và học viên không thuộc hai nhóm đó được thêm sau bằng Thêm học viên test.</p>' +
       '<div class="folder-grid">' + cards + '</div>');
@@ -2109,10 +1830,10 @@
     var rows = entry.students || [];
     if (!rows.length) return '<tr><td colspan="5">Chưa có học viên trong thẻ này.</td></tr>';
     return rows.map(function (stu) {
-      var score = canExamOps()
+      var score = canEdit()
         ? '<input data-exam-score data-exam="' + esc(exam.id) + '" data-entry="' + esc(entry.classId) + '" data-stu="' + esc(stu.studentId) + '" value="' + esc(stu.score || '') + '">'
         : esc(stu.score || '—');
-      var review = canExamOps()
+      var review = canEdit()
         ? '<input data-exam-review data-exam="' + esc(exam.id) + '" data-entry="' + esc(entry.classId) + '" data-stu="' + esc(stu.studentId) + '" value="' + esc(stu.review || '') + '">'
         : esc(stu.review || '—');
       return '<tr><td>' + esc(stu.name || '—') + (stu.extra ? ' <span class="tag">Test</span>' : '') + '</td><td>' + esc(stu.englishName || '—') + '</td><td>' +
@@ -2178,7 +1899,7 @@
       var dates = examDateList(entry).map(function (iso) {
         return L.formatDMY(L.parseDateInput(iso));
       }).join(', ');
-      var extra = canExamOps()
+      var extra = canEdit()
         ? '<label class="field"><span>Thêm học viên test</span><input data-exam-extra data-entry="' + esc(entry.classId) + '" placeholder="Tên hoặc mã trong lớp" autocomplete="off"></label>' +
           '<div class="rejoin-list" id="extra-' + esc(entry.classId) + '"></div>'
         : '';
@@ -2190,11 +1911,11 @@
     return shell('<div class="section-head"><div><button type="button" class="btn" data-act="exam-list">← Kỳ thi</button>' +
       '<h2>' + esc(exam.name) + '</h2><p class="meta">' + (exam.type === 'pick' ? 'Chọn lọc' : 'Theo lớp') + '</p>' + age + '</div></div>' +
       '<p class="help">Lịch tuần tính từ tuần của ngày thi sớm nhất tới tuần của ngày thi muộn nhất.</p>' +
-      (canExamOps() ? '' : '<p class="help">Tài khoản này chỉ xem điểm và đánh giá.</p>') + chips + cards);
+      (canEdit() ? '' : '<p class="help">Tài khoản này chỉ xem điểm và đánh giá.</p>') + chips + cards);
   }
 
   function viewExam() {
-    if (ui.examWizard && canExamOps()) return examWizardView();
+    if (ui.examWizard && canEdit()) return examWizardView();
     if (ui.examId) return examDetailView();
     return examListView();
   }
@@ -2648,7 +2369,7 @@
           (phase.reason ? '<small>' + esc(phase.reason) + '</small>' : '') + '</div>'
         : '';
       var picked = ui.selected[stu.id] ? ' checked' : '';
-      return '<tr class="' + rowCls + '">' + (canStudentOps() ? '<td><input type="checkbox" data-pick="' + esc(stu.id) + '"' + picked + ' aria-label="Chọn ' + esc(stu.name) + '"></td>' : '') +
+      return '<tr class="' + rowCls + '">' + (canEdit() ? '<td><input type="checkbox" data-pick="' + esc(stu.id) + '"' + picked + ' aria-label="Chọn ' + esc(stu.name) + '"></td>' : '') +
         '<td>' + (gray ? '' : (index + 1)) + '</td>' +
         '<td>' + esc(showText(stu.code)) + '</td>' +
         '<td><button type="button" class="stu-name' + (stu.id === openId ? ' is-open' : '') + '" data-act="open-student" data-id="' + esc(stu.id) + '">' + esc(showText(stu.name)) + '</button>' + mark + note + card + '</td>' +
@@ -2677,7 +2398,7 @@
       return '<span class="slot-pill">' + esc(day.short) + ' ' + esc(L.formatTimeValue(slot.start)) + ' – ' + esc(L.formatTimeValue(slot.end)) + '</span>';
     }).join('');
     var edit = canEdit();
-    var studentOps = canStudentOps();
+    var studentOps = canEdit();
     var table = '<div class="table-wrap" id="roster-table"><table><thead><tr>' +
       (studentOps ? '<th><input type="checkbox" data-pick-all ' + (allOn ? 'checked' : '') + ' aria-label="Chọn tất cả"></th>' : '') +
       '<th>STT</th><th>Mã học viên</th><th>Học viên</th><th>English name</th><th>Giới tính</th><th>Ngày sinh</th><th>Tuổi</th><th>First EC</th>' +
@@ -2694,8 +2415,8 @@
       }).join('') + '</tbody></table></div></div>' : '';
     var n = selectedIds().length;
     var printBtn = canExportClasses() ? '<button type="button" class="btn" data-act="print-students">Print (in)</button>' : '';
-    var tools = (edit || canClassOps() || printBtn) ? '<div class="btn-row">' +
-      (canClassOps() ? '<button type="button" class="btn" data-act="edit-class">Sửa lớp</button>' : '') +
+    var tools = (edit || canEdit() || printBtn) ? '<div class="btn-row">' +
+      (canEdit() ? '<button type="button" class="btn" data-act="edit-class">Sửa lớp</button>' : '') +
       (edit ? '<button type="button" class="btn" data-act="open-import">Cập nhật Excel</button>' +
       '<button type="button" class="btn btn-primary" data-act="open-add-student">+ Thêm học viên</button>' : '') +
       printBtn + '</div>' : '';
@@ -2873,7 +2594,7 @@
                 return '<div class="tt-card tt-soa"><strong>' + esc(chip.name) + '</strong><small>SOA · Office</small><small>FET: ' +
                   esc(L.staffText(chip.fet)) + '</small>' + drop + '</div>';
               }
-              var act = (canScheduleOps() || canClassOps()) ? 'schedule-pick' : 'open-class';
+              var act = (canEdit()) ? 'schedule-pick' : 'open-class';
               var tag = chip.tag ? '<small class="tt-tag">' + esc(chip.tag) + '</small>' : '';
               return '<button type="button" class="tt-card group-' + esc(String(chip.group).toLowerCase()) + '" data-act="' + act + '" data-id="' + esc(chip.id) + '" data-key="' + esc(chip.sessionKey || '') + '" data-iso="' + esc(chip.iso || '') + '" data-start="' + esc(chip.start || '') + '" data-end="' + esc(chip.end || '') + '">' +
                 bangHtml(chip.alert) + '<strong>' + esc(chip.name) + '</strong>' + tag + '<small>FET: ' + esc(L.staffText(chip.fet)) + '</small>' +
@@ -3506,7 +3227,7 @@
   function scheduleChoiceForm() {
     var cls = findClass(ui.modal.id);
     var fetBox = '';
-    if (cls && canClassOps()) {
+    if (cls && canEdit()) {
       var key = String(ui.modal.iso || '') + '|' + String(ui.modal.start || '');
       var override = cls.sessionFets && cls.sessionFets[key] ? cls.sessionFets[key] : '';
       var names = {};
@@ -3518,8 +3239,8 @@
       fetBox = '<label class="field"><span>FET phụ trách buổi này</span><select id="session-fet">' + options + '</select></label>' +
         '<p class="help">Mục này chỉ hiện khi buổi đã được chọn. Chọn FET lớp thì buổi dùng FET của lớp. Buổi nào chọn giáo viên khác thì hồ sơ lớp hiện đủ các FET đang phụ trách.</p>';
     }
-    var move = canScheduleOps() ? '<button type="button" class="btn btn-primary" data-act="move-session">Hủy/ đổi buổi</button>' : '';
-    var saveFet = canClassOps() ? '<button type="button" class="btn" data-act="save-session-fet">Lưu FET buổi</button>' : '';
+    var move = canEdit() ? '<button type="button" class="btn btn-primary" data-act="move-session">Hủy/ đổi buổi</button>' : '';
+    var saveFet = canEdit() ? '<button type="button" class="btn" data-act="save-session-fet">Lưu FET buổi</button>' : '';
     return modalShell('Buổi học',
       '<p><b>' + esc(cls ? L.currentName(cls) : '') + '</b></p><p>' + esc(sessionLabel(ui.modal)) + '</p>' + fetBox,
       move + saveFet +
@@ -3553,61 +3274,13 @@
   }
 
   function suggestForm() {
-    var draft = ui.suggest || { type: 'transfer' };
-    var type = draft.type || 'transfer';
-    var people = suggestRecipients(type);
-    var personOptions = '<option value="">Chọn nhân sự</option>' + people.map(function (acc) {
-      return '<option value="' + esc(acc.username) + '"' + (draft.to === acc.username ? ' selected' : '') + '>' + esc(acc.name) + '</option>';
-    }).join('');
-    var student = null;
-    var fromClass = null;
-    if (draft.studentId) {
-      state.classes.forEach(function (cls) {
-        (cls.students || []).forEach(function (stu) {
-          if (stu && stu.id === draft.studentId) { student = stu; fromClass = cls; }
-        });
-      });
-    }
-    var studentList = '';
-    if (type === 'transfer') {
-      var q = String(draft.query || '').trim().toLowerCase();
-      var hits = [];
-      state.classes.forEach(function (cls) {
-        (cls.students || []).forEach(function (stu) {
-          if (!stu || stu.status === 'stopped') return;
-          var blob = (stu.name + ' ' + (stu.code || '')).toLowerCase();
-          if (q && blob.indexOf(q) < 0) return;
-          hits.push({ stu: stu, cls: cls });
-        });
-      });
-      studentList = '<label class="field"><span>Tìm học viên</span><input id="suggest-q" value="' + esc(draft.query || '') + '" placeholder="Tên học viên" autocomplete="off"></label>' +
-        '<div class="pick-grid">' + hits.slice(0, 30).map(function (hit) {
-          var on = draft.studentId === hit.stu.id ? ' is-on' : '';
-          return '<button type="button" class="pick-opt' + on + '" data-act="suggest-student" data-id="' + esc(hit.stu.id) + '"><span>' + esc(hit.stu.name) + '<small>' + esc(L.currentName(hit.cls)) + '</small></span></button>';
-        }).join('') + '</div>' +
-        (student ? '<p class="help">Lớp hiện tại: ' + esc(L.currentName(fromClass)) + ' · ' + esc(L.scheduleText(fromClass)) + '</p>' : '') +
-        '<p class="field-label">Lớp chuyển đến</p><div class="pick-grid" id="suggest-classes">' + classPickButtons(draft.classId) + '</div>' +
-        '<label class="field"><span>Lý do chuyển</span><textarea id="suggest-reason" required>' + esc(draft.reason || '') + '</textarea></label>';
-    }
-    var addBlock = type === 'add'
-      ? '<label class="field"><span>Tên học viên</span><input id="suggest-name" value="' + esc(draft.name || '') + '" required></label>' +
-        '<label class="field"><span>Ngày sinh</span><input id="suggest-dob" type="date" value="' + esc(draft.dob || '') + '"></label>' +
-        '<label class="field"><span>Tên tiếng Anh</span><input id="suggest-en" value="' + esc(draft.englishName || '') + '"></label>' +
-        '<label class="field"><span>Số điện thoại</span><input id="suggest-phone" value="' + esc(draft.phone || '') + '"></label>' +
-        '<label class="field"><span>EC phụ trách</span><input id="suggest-ec" value="' + esc(draft.ec || '') + '"></label>' +
-        '<p class="field-label">Lớp nhận học viên</p><div class="pick-grid" id="suggest-classes">' + classPickButtons(draft.classId) + '</div>'
-      : '';
-    var otherBlock = type === 'other'
-      ? '<label class="field"><span>Nội dung</span><textarea id="suggest-text" maxlength="1500">' + esc(draft.text || '') + '</textarea></label>'
-      : '';
     return modalShell('Đề xuất',
       '<label class="field"><span>Loại đề xuất</span><select id="suggest-type">' +
-      '<option value="transfer"' + (type === 'transfer' ? ' selected' : '') + '>Chuyển lớp</option>' +
-      '<option value="add"' + (type === 'add' ? ' selected' : '') + '>Thêm học viên</option>' +
-      '<option value="other"' + (type === 'other' ? ' selected' : '') + '>Khác</option></select></label>' +
-      '<label class="field"><span>Nhân sự nhận</span><select id="suggest-to">' + personOptions + '</select></label>' +
-      '<p class="help">Nhân sự không có quyền chuyển lớp hoặc thêm học viên sẽ không có trong danh sách của hai loại đó.</p>' +
-      studentList + addBlock + otherBlock,
+      '<option value="add">Add học viên</option>' +
+      '<option value="transfer">Chuyển lớp</option>' +
+      '<option value="other">Khác</option></select></label>' +
+      '<label class="field"><span>Nội dung</span><textarea id="suggest-text" maxlength="1500"></textarea></label>' +
+      '<p class="help">Gửi lên Google Sheet. Username vào cột Mã nhân sự, tên hiển thị vào cột Tên nhân sự, nội dung vào cột Nội dung. Số thứ tự và thời gian do bảng tính ghi. Mỗi loại vào một thẻ riêng.</p>',
       '<button type="button" class="btn btn-primary" data-act="suggest-send">Gửi</button><button type="button" class="btn" data-act="close-modal">Hủy</button>');
   }
 
@@ -4093,7 +3766,7 @@
 
   function saveClass(form) {
     var editingClass = !!(ui.modal && ui.modal.type === 'edit-class');
-    if (editingClass) { if (deny(canClassOps())) return; }
+    if (editingClass) { if (deny(canEdit())) return; }
     else if (deny(canEdit())) return;
     var slots = readSchedule(form);
     var problem = validateSchedule(slots);
@@ -4310,7 +3983,7 @@
   }
 
   function doTransfer() {
-    if (deny(canStudentOps())) return;
+    if (deny(canEdit())) return;
     var target = document.getElementById('transfer-target');
     if (!target) return;
     var result = L.transferStudents(state, ui.classId, target.value, selectedIds(), new Date());
@@ -4353,7 +4026,7 @@
   }
 
   function doDeleteStudents(ids) {
-    if (deny(canStudentOps())) return;
+    if (deny(canEdit())) return;
     var cls = findClass(ui.classId);
     if (!cls) return;
     var drop = {};
@@ -4387,7 +4060,7 @@
   }
 
   function doDeleteClass() {
-    if (deny(canClassOps())) return;
+    if (deny(canEdit())) return;
     var cls = findClass(ui.classId);
     var className = cls ? L.currentName(cls) : 'lớp';
     var drop = {};
@@ -4412,27 +4085,6 @@
     title.disabled = !canEdit();
     var saveBtn = document.querySelector('#settings-form [type="submit"]');
     if (saveBtn) saveBtn.hidden = !canEdit();
-    var urlBox = document.getElementById('supabase-url');
-    var keyBox = document.getElementById('supabase-key');
-    if (urlBox) {
-      urlBox.value = state.settings.supabaseUrl || '';
-      urlBox.disabled = !canEdit();
-    }
-    if (keyBox) {
-      keyBox.value = state.settings.supabaseKey || '';
-      keyBox.disabled = !canEdit();
-    }
-    var socketStatus = document.getElementById('socket-status');
-    if (socketStatus) {
-      var liveState = window.OceanLive ? window.OceanLive.status() : 'off';
-      var liveText = {
-        off: 'Socket đang tắt.',
-        wait: 'Đang nối socket.',
-        on: 'Socket đã nối phòng ocean-edu.',
-        error: 'Socket chưa nối được. Kiểm tra URL, anon key và Realtime.'
-      };
-      socketStatus.textContent = liveText[liveState] || liveText.off;
-    }
     document.getElementById('settingsbox').classList.remove('hidden');
     paintThemeButtons();
     paintAccounts();
@@ -4935,211 +4587,84 @@
     printSpec(spec);
   }
 
-  function findTask(id) {
-    var key = String(id || '');
-    for (var i = 0; i < (state.tasks || []).length; i++) {
-      if (state.tasks[i] && state.tasks[i].id === key) return state.tasks[i];
-    }
-    return null;
+  function callScript(payload) {
+    return new Promise(function (resolve, reject) {
+      var url = SUGGEST_URL;
+      var cb = 'oceanCb_' + Date.now();
+      var script = document.createElement('script');
+      var timer = setTimeout(function () {
+        cleanup();
+        reject(new Error('Không nhận được phản hồi từ ứng dụng web đề xuất.'));
+      }, 12000);
+      function cleanup() {
+        clearTimeout(timer);
+        try { delete window[cb]; } catch (err) { window[cb] = undefined; }
+        if (script.parentNode) script.parentNode.removeChild(script);
+      }
+      window[cb] = function (result) {
+        cleanup();
+        if (result && result.ok) resolve(result);
+        else reject(new Error((result && result.error) || 'Google Sheet từ chối dữ liệu.'));
+      };
+      var join = url.indexOf('?') >= 0 ? '&' : '?';
+      script.src = url + join + 'callback=' + encodeURIComponent(cb) + '&payload=' + encodeURIComponent(JSON.stringify(payload || {}));
+      script.onerror = function () {
+        cleanup();
+        reject(new Error('Không tải được ứng dụng web đề xuất.'));
+      };
+      document.head.appendChild(script);
+    });
   }
 
-  function readSuggestDraft() {
-    var draft = ui.suggest || { type: 'transfer' };
-    var typeEl = document.getElementById('suggest-type');
-    var toEl = document.getElementById('suggest-to');
-    if (typeEl) draft.type = typeEl.value || draft.type || 'transfer';
-    if (toEl) draft.to = toEl.value || '';
-    var q = document.getElementById('suggest-q');
-    if (q) draft.query = q.value;
-    var reason = document.getElementById('suggest-reason');
-    if (reason) draft.reason = reason.value;
-    var name = document.getElementById('suggest-name');
-    if (name) draft.name = name.value;
-    var dob = document.getElementById('suggest-dob');
-    if (dob) draft.dob = dob.value;
-    var en = document.getElementById('suggest-en');
-    if (en) draft.englishName = en.value;
-    var phone = document.getElementById('suggest-phone');
-    if (phone) draft.phone = phone.value;
-    var ec = document.getElementById('suggest-ec');
-    if (ec) draft.ec = ec.value;
-    var text = document.getElementById('suggest-text');
-    if (text) draft.text = text.value;
-    ui.suggest = draft;
-    return draft;
-  }
-
-  function saveSessionFet() {
-    if (deny(canClassOps()) || !ui.modal) return;
-    var cls = findClass(ui.modal.id);
-    if (!cls) return;
-    var key = String(ui.modal.iso || '') + '|' + String(ui.modal.start || '');
-    if (!/^\d{4}-\d{2}-\d{2}\|/.test(key)) { showFormError('Buổi này chưa có ngày để gán FET.'); return; }
-    var select = document.getElementById('session-fet');
-    var name = select ? String(select.value || '').trim() : '';
-    if (!cls.sessionFets || typeof cls.sessionFets !== 'object' || Array.isArray(cls.sessionFets)) cls.sessionFets = {};
-    if (!name) delete cls.sessionFets[key];
-    else cls.sessionFets[key] = name;
-    logAction('gán FET buổi ' + sessionLabel(ui.modal) + ' của lớp ' + L.currentName(cls) + (name ? ' cho ' + name : ' về FET lớp'));
-    ui.modal = null;
-    ui.formError = '';
-    save();
-    toast(name ? 'Buổi này do ' + name + ' phụ trách.' : 'Buổi này dùng FET của lớp.');
-    render();
+  function requestUpdate() {
+    if (!ui.user || ui.sending) return;
+    ui.sending = true;
+    callScript({
+      action: 'row',
+      type: 'other',
+      username: ui.user.username,
+      name: ui.user.name,
+      content: 'Nhân sự yêu cầu cập nhật sổ tay',
+      red: true
+    }).then(function () {
+      ui.sending = false;
+      toast('Đã gửi yêu cầu cập nhật sổ tay lên thẻ Khác.');
+    }).catch(function (err) {
+      ui.sending = false;
+      toast(err.message || 'Không gửi được.');
+    });
   }
 
   function sendSuggestion() {
     if (deny(canSuggest())) return;
-    var draft = readSuggestDraft();
-    var type = draft.type === 'add' || draft.type === 'other' ? draft.type : 'transfer';
-    var recipient = accountByUsername(draft.to);
-    var allowed = suggestRecipients(type).some(function (acc) { return recipient && acc.username === recipient.username; });
-    if (!recipient || !allowed) { showFormError('Chọn nhân sự nhận đề xuất.'); return; }
-    var now = new Date();
-    var task = {
-      id: L.uid(),
-      type: type,
-      status: 'open',
-      createdAt: now.toISOString(),
-      updatedAt: now.toISOString(),
-      actedAt: '',
-      month: L.monthKey(now),
-      fromUser: ui.user.username,
-      fromName: ui.user.name,
-      toUser: recipient.username,
-      toName: recipient.name,
-      summary: '',
-      reason: '',
-      rejectReason: '',
-      studentId: '',
-      studentName: '',
-      fromClassId: '',
-      fromClassName: '',
-      toClassId: '',
-      toClassName: '',
-      draft: null
-    };
-    if (type === 'transfer') {
-      if (!draft.studentId) { showFormError('Chọn học viên.'); return; }
-      if (!draft.classId) { showFormError('Chọn lớp chuyển đến.'); return; }
-      var why = String(draft.reason || '').trim();
-      if (!why) { showFormError('Viết lý do chuyển.'); return; }
-      var found = findStudent(draft.studentId);
-      var dest = findClass(draft.classId);
-      if (!found || !dest) { showFormError('Không thấy học viên hoặc lớp.'); return; }
-      if (found.cls.id === dest.id) { showFormError('Học viên đã ở lớp này.'); return; }
-      task.studentId = found.stu.id;
-      task.studentName = found.stu.name || '';
-      task.fromClassId = found.cls.id;
-      task.fromClassName = L.currentName(found.cls);
-      task.toClassId = dest.id;
-      task.toClassName = L.currentName(dest);
-      task.reason = why;
-      task.summary = (found.stu.name || 'Học viên') + ' từ ' + task.fromClassName + ' sang ' + task.toClassName + '. Lý do: ' + why;
-    } else if (type === 'add') {
-      var addName = String(draft.name || '').trim();
-      if (!addName) { showFormError('Điền tên học viên.'); return; }
-      if (!draft.classId) { showFormError('Chọn lớp nhận học viên.'); return; }
-      var host = findClass(draft.classId);
-      if (!host) { showFormError('Không thấy lớp nhận.'); return; }
-      task.toClassId = host.id;
-      task.toClassName = L.currentName(host);
-      task.studentName = addName;
-      task.draft = {
-        name: addName,
-        dob: String(draft.dob || ''),
-        englishName: String(draft.englishName || ''),
-        phone: String(draft.phone || ''),
-        ec: String(draft.ec || '')
-      };
-      task.summary = 'Thêm ' + addName + ' vào ' + task.toClassName + '.';
-    } else {
-      var content = String(draft.text || '').trim();
-      if (!content) { showFormError('Hãy viết nội dung đề xuất.'); return; }
-      if (content.length > 1500) { showFormError('Nội dung tối đa 1500 ký tự.'); return; }
-      task.summary = content;
-      task.reason = content;
-    }
-    if (!state.tasks) state.tasks = [];
-    state.tasks.push(task);
-    tasksSeen = true;
-    logAction('gửi đề xuất ' + taskTypeLabel(task.type) + ' tới ' + recipient.name, recipient.username);
-    ui.modal = null;
-    ui.formError = '';
-    ui.suggest = { type: 'transfer' };
-    save();
-    toast('Đã gửi đề xuất tới ' + recipient.name + '.');
-    render();
-  }
-
-  function performTask(id) {
-    var task = findTask(id);
-    var acc = currentAccount();
-    if (!task || !acc || task.toUser !== acc.username) return;
-    if (taskClosed(task)) { toast('Task này chỉ xem lại.'); return; }
-    if ((task.type === 'transfer' || task.type === 'add') && deny(canStudentOps())) return;
-    var now = new Date();
-    if (task.type === 'transfer') {
-      var moved = L.transferStudents(state, task.fromClassId, task.toClassId, [task.studentId], now);
-      if (moved.error) { toast(moved.error); return; }
-    } else if (task.type === 'add') {
-      var cls = findClass(task.toClassId);
-      if (!cls) { toast('Không thấy lớp nhận.'); return; }
-      if (listedCount(cls, now) >= 20) { toast(ROSTER_FULL); return; }
-      var draft = task.draft || {};
-      var made = L.createStudent({
-        code: L.nextStudentCode(state.classes, state.archive),
-        name: draft.name || task.studentName,
-        dob: draft.dob || '',
-        englishName: draft.englishName || '',
-        phone: draft.phone || '',
-        ec: draft.ec || '',
-        originClassId: cls.id,
-        joinedAt: now.toISOString()
-      });
-      cls.students.push(made);
-      task.studentId = made.id;
-      task.studentName = made.name || task.studentName;
-    }
-    task.status = 'done';
-    task.actedAt = now.toISOString();
-    task.updatedAt = now.toISOString();
-    ackItem('task:' + task.id, 'keep');
-    logAction('thực hiện đề xuất ' + taskTypeLabel(task.type) + ' của ' + (task.fromName || 'nhân sự'), task.fromUser);
-    ui.rejectId = '';
-    save();
-    toast('Đã thực hiện đề xuất.');
-    paintMail();
-    paintGate();
-    paintMissed();
-    render();
-  }
-
-  function rejectTask(id, reason) {
-    var task = findTask(id);
-    var acc = currentAccount();
-    if (!task || !acc || task.toUser !== acc.username) return;
-    if (taskClosed(task)) { toast('Task này chỉ xem lại.'); return; }
-    var why = String(reason || '').trim();
-    if (!why) { toast('Cần ghi lý do từ chối.'); return; }
-    var now = new Date();
-    task.status = 'rejected';
-    task.rejectReason = why;
-    task.actedAt = now.toISOString();
-    task.updatedAt = now.toISOString();
-    ackItem('task:' + task.id, 'keep');
-    logAction('từ chối đề xuất ' + taskTypeLabel(task.type) + ' của ' + (task.fromName || 'nhân sự'), task.fromUser);
-    ui.rejectId = '';
-    save();
-    toast('Đã từ chối đề xuất.');
-    paintMail();
-    paintGate();
-    paintMissed();
-    render();
+    var typeEl = document.getElementById('suggest-type');
+    var textEl = document.getElementById('suggest-text');
+    var content = textEl ? textEl.value.trim() : '';
+    if (!content) { showFormError('Hãy viết nội dung đề xuất.'); return; }
+    if (content.length > 1500) { showFormError('Nội dung tối đa 1500 ký tự.'); return; }
+    if (ui.sending) return;
+    ui.sending = true;
+    callScript({
+      action: 'row',
+      type: typeEl ? typeEl.value : 'other',
+      username: ui.user.username,
+      name: ui.user.name,
+      content: content,
+      red: false
+    }).then(function (result) {
+      ui.sending = false;
+      ui.modal = null;
+      ui.formError = '';
+      toast('Đã gửi đề xuất lên thẻ ' + (result.sheet || 'Google Sheet') + '.');
+      render();
+    }).catch(function (err) {
+      ui.sending = false;
+      showFormError(err.message);
+    });
   }
 
   function saveMove() {
-    if (deny(canScheduleOps()) || !ui.modal) return;
+    if (deny(canEdit()) || !ui.modal) return;
     var cls = findClass(ui.modal.id);
     if (!cls) return;
     var picked = document.querySelector('input[name="move-mode"]:checked');
@@ -5292,21 +4817,23 @@
     var panel = document.getElementById('script-panel');
     if (!panel) return;
     if (!canEdit()) { panel.innerHTML = ''; return; }
-    panel.innerHTML = '<h3>Bản data dùng chung</h3>' +
+    panel.innerHTML = '<h3>Đề xuất</h3>' +
+      '<p class="help">Form đề xuất và nút yêu cầu cập nhật gửi lên Google Sheet. Add học viên, Chuyển lớp và Khác vào ba thẻ tương ứng.</p>' +
+      '<p class="deploy-url">' + esc(SUGGEST_URL) + '</p>' +
+      '<h3>Bản data dùng chung</h3>' +
       '<p class="help">' + esc(classNote) + '</p>' +
       '<p class="help">' + esc(dataNote) + '</p>' +
-      '<p class="help">Thư mục Index trên ổ D là kho để đẩy lên GitHub. Mỗi máy kéo bản mới về, mở sổ tay để hợp nhất: lớp theo lần lưu lớp mới hơn, đề xuất, kỳ thi, thông báo và tài khoản gộp theo mã. Tài khoản lấy bản mới hơn và không thay mật khẩu đang có bằng mật khẩu trống. App ghi ocean-edu-classes.json và ocean-edu-data.json vào thư mục đã chọn. Người sửa rồi commit và push. GitHub chỉ phục vụ file, không ghi ngược khi máy khác đang mở.</p>' +
-      '<p class="help">Socket Supabase dùng phòng ocean-edu. Máy nào đang nối sẽ nhận sổ ngay khi máy khác lưu, rồi gộp theo mã. Lớp lấy theo lần lưu lớp mới hơn.</p>' +
+      '<p class="help">App ghi ocean-edu-classes.json và ocean-edu-data.json vào thư mục Index local đã chọn. Góc trên hiện Token đang xoay, rồi chữ confirmed khi cả hai file đã ghi xong. Lúc mở trang, app đọc hai file này. Nếu quyền thư mục còn đang chờ, lần lưu do người dùng bấm sẽ xin quyền rồi ghi. Chưa chọn thư mục thì dữ liệu nằm trên trình duyệt và không hiện confirmed. GitHub chỉ phục vụ file đã đăng, máy khác thấy dữ liệu mới sau khi thư mục được đăng lại.</p>' +
       '<div class="btn-row"><button type="button" class="btn btn-primary" data-act="download-classes">Tải ocean-edu-classes.json</button>' +
       '<button type="button" class="btn" data-act="download-data">Tải ocean-edu-data.json</button>' +
-      '<button type="button" class="btn" data-act="pick-folder">Chọn thư mục Index</button></div>';
+      '<button type="button" class="btn" data-act="pick-folder">Chọn thư mục Index local</button></div>';
   }
 
   function downloadClasses() {
     if (deny(canEdit())) return;
     var blob = new Blob([JSON.stringify(classBookPayload())], { type: 'application/json' });
     downloadBlob(blob, CLASS_FILE);
-    toast('Đã tạo ocean-edu-classes.json. Chép file vào thư mục Index, cạnh index.html, để đồng bộ lớp, học viên và chuyên cần.');
+    toast('Đã tạo ocean-edu-classes.json. Chép file vào thư mục Index local, cạnh index.html, để đồng bộ lớp, học viên và chuyên cần.');
   }
 
   function downloadData() {
@@ -5365,29 +4892,21 @@
         '<option value="guest"' + (role === 'guest' ? ' selected' : '') + '>Guest (xanh biển)</option></select></label>' +
         '<div id="acc-perm-wrap" class="perm-box"' + (role === 'admin' ? ' hidden' : '') + '>' +
         '<p class="field-label">Quyền bật / tắt</p>' +
-        '<label class="checkline"><input type="checkbox" id="perm-suggest"' + (perms.suggest ? ' checked' : '') + '> Quyền đề xuất từ Mục D</label>' +
-        '<label class="checkline"><input type="checkbox" id="perm-student"' + (perms.studentOps ? ' checked' : '') + '> Quyền thao tác chuyển lớp, xóa học viên</label>' +
-        '<label class="checkline"><input type="checkbox" id="perm-class"' + (perms.classOps ? ' checked' : '') + '> Quyền thay đổi thông tin lớp, xóa lớp</label>' +
-        '<label class="checkline"><input type="checkbox" id="perm-schedule"' + (perms.scheduleOps ? ' checked' : '') + '> Quyền hủy lịch, đổi lịch</label>' +
-        '<label class="checkline"><input type="checkbox" id="perm-feed"' + (perms.staffFeed ? ' checked' : '') + '> Nhận thông tin thao tác của các nhân sự khác</label>' +
-        '<label class="checkline"><input type="checkbox" id="perm-exam"' + (perms.examOps ? ' checked' : '') + '> Tạo lịch, tổ chức buổi thi ở Mục G</label></div>' +
+        '<label class="checkline"><input type="checkbox" id="perm-classes"' + (perms.exportClasses ? ' checked' : '') + '> Quyền xuất file trên danh sách lớp</label>' +
+        '<label class="checkline"><input type="checkbox" id="perm-homework"' + (perms.exportHomework ? ' checked' : '') + '> Quyền xuất file trên danh sách chuyên cần</label>' +
+        '<label class="checkline"><input type="checkbox" id="perm-suggest"' + (perms.suggest ? ' checked' : '') + '> Quyền comment, nhắn tin đề xuất ở Mục D</label></div>' +
         '<label class="field" id="acc-pass-wrap"' + (role === 'guest' ? ' hidden' : '') + '><span>Mật khẩu' + (editing ? ' — gõ mật khẩu mới, để trống nếu giữ mật khẩu đang dùng' : ' — gõ mật khẩu dùng để đăng nhập') + '</span><input id="acc-pass" type="password" autocomplete="off" readonly spellcheck="false"></label>' +
         '<div class="btn-row"><button type="submit" class="btn btn-primary">Lưu tài khoản</button><button type="button" class="btn" data-act="cancel-account">Hủy</button></div></form>';
     }
-    panel.innerHTML = '<h3>Quản lý tài khoản</h3><p class="help">Admin sửa tài khoản của mình, thêm, xóa và phân bậc tài khoản khác. Với Commenter và Guest, bật hoặc tắt từng quyền bên dưới. Việc không được bật thì tài khoản đó không làm được. Commenter vẫn đánh dấu chuyên cần. In và xuất file chỉ Admin. Chọn Guest thì không nhập mật khẩu.</p>' +
+    panel.innerHTML = '<h3>Quản lý tài khoản</h3><p class="help">Admin sửa tài khoản của mình, thêm, xóa và phân bậc tài khoản khác. Với Commenter và Guest, bật hoặc tắt từng quyền. Các việc không được bật (sửa lớp, học viên, tài khoản, đăng thông báo, đổi buổi) chỉ Admin làm được. Commenter vẫn đánh dấu chuyên cần. Chọn Guest thì không nhập mật khẩu.</p>' +
       rows + (ui.accountForm ? '' : '<button type="button" class="btn btn-primary" data-act="new-account">+ Tạo tài khoản</button>') + form;
   }
 
   function permBits(acc) {
     var perms = accountPerms(acc);
-    var bits = [];
-    if (perms.suggest) bits.push('Đề xuất');
-    if (perms.studentOps) bits.push('Học viên');
-    if (perms.classOps) bits.push('Lớp');
-    if (perms.scheduleOps) bits.push('Lịch');
-    if (perms.staffFeed) bits.push('Theo dõi');
-    if (perms.examOps) bits.push('Thi');
-    return bits.length ? bits.join(' · ') : 'Không bật quyền';
+    return (perms.exportClasses ? 'Xuất lớp: bật' : 'Xuất lớp: tắt') + ' · ' +
+      (perms.exportHomework ? 'Xuất chuyên cần: bật' : 'Xuất chuyên cần: tắt') + ' · ' +
+      (perms.suggest ? 'Đề xuất: bật' : 'Đề xuất: tắt');
   }
 
   function saveAccountForm(event) {
@@ -5414,17 +4933,10 @@
     if (role !== 'guest' && !nextPassword) { toast('Admin và Commenter cần mật khẩu.'); return; }
     var perms = null;
     if (role !== 'admin') {
-      function permOn(id) {
-        var box = document.getElementById(id);
-        return !!(box && box.checked);
-      }
       perms = {
-        suggest: permOn('perm-suggest'),
-        studentOps: permOn('perm-student'),
-        classOps: permOn('perm-class'),
-        scheduleOps: permOn('perm-schedule'),
-        staffFeed: permOn('perm-feed'),
-        examOps: permOn('perm-exam')
+        exportClasses: !!(document.getElementById('perm-classes') && document.getElementById('perm-classes').checked),
+        exportHomework: !!(document.getElementById('perm-homework') && document.getElementById('perm-homework').checked),
+        suggest: !!(document.getElementById('perm-suggest') && document.getElementById('perm-suggest').checked)
       };
     }
     var wasSelf = !!(editing && ui.user && ui.user.username === editing.username);
@@ -5500,18 +5012,18 @@
       'exam-extra-pick': 1, 'exam-day': 1, 'exam-cal': 1
     };
     if (adminOnly[act] && deny(canEdit())) return;
-    if (studentActs[act] && deny(canStudentOps())) return;
-    if (classActs[act] && deny(canClassOps())) return;
-    if (examActs[act] && deny(canExamOps())) return;
+    if (studentActs[act] && deny(canEdit())) return;
+    if (classActs[act] && deny(canEdit())) return;
+    if (examActs[act] && deny(canEdit())) return;
     if ((act === 'hw-cell' || act === 'hw-set') && deny(canMark())) return;
     if (act === 'export-schedule' && deny(canExportClasses())) return;
     if (act === 'export-classes' && deny(canExportClasses())) return;
     if (act === 'print-students' && deny(canExportClasses())) return;
     if (act === 'export-homework' && deny(canExportHomework())) return;
-    if ((act === 'suggest-open' || act === 'suggest-send' || act === 'suggest-class' || act === 'suggest-student') && deny(canSuggest())) return;
-    if (act === 'schedule-pick' && deny(canScheduleOps() || canClassOps())) return;
-    if ((act === 'move-session' || act === 'save-move') && deny(canScheduleOps())) return;
-    if (act === 'save-session-fet' && deny(canClassOps())) return;
+    if ((act === 'suggest-open' || act === 'suggest-send') && deny(canSuggest())) return;
+    if (act === 'schedule-pick' && deny(canEdit())) return;
+    if ((act === 'move-session' || act === 'save-move') && deny(canEdit())) return;
+    if (act === 'save-session-fet' && deny(canEdit())) return;
     if (act === 'open-clock') { document.getElementById('clockbox').classList.remove('hidden'); paintClock(); return; }
     if (act === 'close-clock') { document.getElementById('clockbox').classList.add('hidden'); return; }
     if (act === 'open-settings') { openSettings(); return; }
@@ -5521,56 +5033,6 @@
     if (act === 'set-skin') { applySkin(btn.getAttribute('data-skin')); return; }
     if (act === 'gate-confirm') { confirmGate(btn.getAttribute('data-id')); return; }
     if (act === 'gate-confirm-old') { confirmOldGate(); return; }
-    if (act === 'mail-toggle') {
-      var mailPanel = document.getElementById('mailbox');
-      if (!mailPanel) return;
-      var opening = mailPanel.classList.contains('hidden');
-      mailPanel.classList.toggle('hidden', !opening);
-      if (opening) {
-        if (!ui.mailMonth) ui.mailMonth = L.monthKey(new Date());
-        paintMail();
-      }
-      return;
-    }
-    if (act === 'mail-close') {
-      var mailClose = document.getElementById('mailbox');
-      if (mailClose) mailClose.classList.add('hidden');
-      return;
-    }
-    if (act === 'mail-open') {
-      ui.mailId = btn.getAttribute('data-id') || '';
-      ui.rejectId = '';
-      var mailOpen = document.getElementById('mailbox');
-      if (mailOpen) mailOpen.classList.remove('hidden');
-      paintMail();
-      return;
-    }
-    if (act === 'missed-show') {
-      var missedCard = document.getElementById('missed-card');
-      if (missedCard) missedCard.classList.remove('hidden');
-      if (ui.missedAt < 0) ui.missedAt = 0;
-      paintMissedCard();
-      return;
-    }
-    if (act === 'missed-next') {
-      var missedRows = missedTasks(new Date());
-      if (!missedRows.length) { paintMissed(); return; }
-      ui.missedAt = (ui.missedAt + 1) % missedRows.length;
-      paintMissedCard(missedRows);
-      return;
-    }
-    if (act === 'missed-open') {
-      var missedList = missedTasks(new Date());
-      var missedTask = missedList[ui.missedAt] || missedList[0];
-      if (!missedTask) return;
-      ui.mailId = missedTask.id;
-      ui.mailMonth = missedTask.month || String(missedTask.createdAt || '').slice(0, 7);
-      ui.rejectId = '';
-      var missedMail = document.getElementById('mailbox');
-      if (missedMail) missedMail.classList.remove('hidden');
-      paintMail();
-      return;
-    }
     if (act === 'open-notices') {
       ui.noticeMonth = ui.boardMonth || L.monthKey(new Date());
       var notice = document.getElementById('noticebox');
@@ -5583,26 +5045,7 @@
       if (noticeClose) noticeClose.classList.add('hidden');
       return;
     }
-    if (act === 'task-do') { performTask(btn.getAttribute('data-id')); return; }
-    if (act === 'task-reject') { ui.rejectId = btn.getAttribute('data-id') || ''; paintMail(); return; }
-    if (act === 'task-reject-cancel') { ui.rejectId = ''; paintMail(); return; }
-    if (act === 'task-reject-send') {
-      var rejectBox = document.getElementById('reject-reason');
-      rejectTask(btn.getAttribute('data-id'), rejectBox ? rejectBox.value : '');
-      return;
-    }
-    if (act === 'suggest-class') {
-      readSuggestDraft();
-      ui.suggest.classId = btn.getAttribute('data-id') || '';
-      render();
-      return;
-    }
-    if (act === 'suggest-student') {
-      readSuggestDraft();
-      ui.suggest.studentId = btn.getAttribute('data-id') || '';
-      render();
-      return;
-    }
+    if (act === 'request-update') { requestUpdate(); return; }
     if (act === 'logout') {
       ui.user = null;
       ui.screen = 'login';
@@ -5696,7 +5139,6 @@
     if (act === 'print-students') { printStudents(); return; }
     if (act === 'suggest-open') {
       ui.formError = '';
-      ui.suggest = { type: 'transfer' };
       ui.modal = { type: 'suggest' };
       render();
       return;
@@ -5726,12 +5168,12 @@
     if (act === 'download-data') { downloadData(); return; }
     if (act === 'pick-folder') {
       if (!window.showDirectoryPicker) {
-        toast('Trình duyệt không cho trang ghi thẳng vào thư mục. Hãy tải ocean-edu-classes.json, chép vào Index rồi đăng lại lên Netlify.');
+        toast('Trình duyệt không cho trang ghi thẳng vào thư mục. Hãy tải ocean-edu-classes.json, chép vào Index local rồi đăng lại thư mục.');
         return;
       }
       folderAsked = true;
       showSync('saving');
-      window.showDirectoryPicker({ id: 'ocean-edu-index', mode: 'readwrite' }).then(function (handle) {
+      window.showDirectoryPicker({ id: 'ocean-edu-index-local', mode: 'readwrite' }).then(function (handle) {
         return rememberFolder(handle).then(function () { return writeDataFile(); });
       }).then(function (ok) {
         if (ok) {
@@ -5744,7 +5186,7 @@
       }).catch(function (err) {
         showSync('idle');
         if (err && err.name === 'AbortError') return;
-        toast('Không gắn được thư mục. Hãy tải file và lưu vào Index.');
+        toast('Không gắn được thư mục. Hãy tải file và lưu vào Index local.');
       });
       return;
     }
@@ -6209,21 +5651,6 @@
       render();
       return;
     }
-    if (t.id === 'suggest-type') {
-      readSuggestDraft();
-      ui.suggest.type = t.value || 'transfer';
-      ui.suggest.to = '';
-      ui.suggest.classId = '';
-      render();
-      return;
-    }
-    if (t.id === 'mail-month') {
-      ui.mailMonth = t.value || L.monthKey(new Date());
-      ui.mailId = '';
-      ui.rejectId = '';
-      paintMail();
-      return;
-    }
     if (t.id === 'notice-month') {
       ui.noticeMonth = t.value || L.monthKey(new Date());
       paintNotices();
@@ -6235,18 +5662,12 @@
       var permWrap = document.getElementById('acc-perm-wrap');
       if (permWrap) permWrap.hidden = t.value === 'admin';
       var defaults = defaultPerms(t.value);
-      var permMap = {
-        'perm-suggest': defaults.suggest,
-        'perm-student': defaults.studentOps,
-        'perm-class': defaults.classOps,
-        'perm-schedule': defaults.scheduleOps,
-        'perm-feed': defaults.staffFeed,
-        'perm-exam': defaults.examOps
-      };
-      Object.keys(permMap).forEach(function (id) {
-        var box = document.getElementById(id);
-        if (box) box.checked = !!permMap[id];
-      });
+      var classesBox = document.getElementById('perm-classes');
+      var homeworkBox = document.getElementById('perm-homework');
+      var suggestBox = document.getElementById('perm-suggest');
+      if (classesBox) classesBox.checked = defaults.exportClasses;
+      if (homeworkBox) homeworkBox.checked = defaults.exportHomework;
+      if (suggestBox) suggestBox.checked = defaults.suggest;
       if (ui.accountForm) ui.accountForm.role = t.value;
       return;
     }
@@ -6358,19 +5779,6 @@
       });
       return;
     }
-    if (e.target.id === 'suggest-q') {
-      var suggestStart = e.target.selectionStart;
-      var suggestEnd = e.target.selectionEnd;
-      readSuggestDraft();
-      ui.suggest.query = e.target.value;
-      render();
-      var suggestBox = document.getElementById('suggest-q');
-      if (suggestBox) {
-        suggestBox.focus();
-        if (suggestStart != null && suggestBox.setSelectionRange) suggestBox.setSelectionRange(suggestStart, suggestEnd);
-      }
-      return;
-    }
     if (e.target.id === 'transfer-q') {
       var transferQuery = String(e.target.value || '').trim().toLowerCase();
       document.querySelectorAll('#transfer-picks .pick-opt').forEach(function (el) {
@@ -6442,27 +5850,11 @@
       if (deny(canEdit())) return;
       var title = document.getElementById('setting-title').value.trim();
       if (!title) return;
-      var urlInput = document.getElementById('supabase-url');
-      var keyInput = document.getElementById('supabase-key');
-      var rawUrl = urlInput ? urlInput.value.trim() : '';
-      var rawKey = keyInput ? keyInput.value.trim() : '';
-      var nextUrl = cleanSupabaseUrl(rawUrl);
-      var nextKey = cleanSupabaseKey(rawKey);
-      if ((rawUrl || rawKey) && (!nextUrl || !nextKey)) {
-        toast('URL Supabase hoặc anon key chưa đúng.');
-        return;
-      }
       state.settings.title = title;
-      if (nextUrl && nextKey) {
-        state.settings.supabaseUrl = nextUrl;
-        state.settings.supabaseKey = nextKey;
-      } else {
-        delete state.settings.supabaseUrl;
-        delete state.settings.supabaseKey;
-      }
+      delete state.settings.supabaseUrl;
+      delete state.settings.supabaseKey;
       save();
       paintTitles();
-      connectSocket();
       closeSettings();
       toast('Đã lưu cài đặt.');
       return;
@@ -6587,7 +5979,6 @@
   function finishBoot() {
     applyTheme(state.settings.theme);
     savePaused = false;
-    bindOceanLive();
     var loader = document.getElementById('loader');
     try {
       var savedUser = JSON.parse(sessionStorage.getItem('oceanEduUser') || 'null');
@@ -6603,8 +5994,6 @@
           if (persistBook || changed) save(persistBook && !changed ? { keepStamp: true, quiet: true } : { quiet: true });
         }).then(function () {
           paintGate();
-          playUnseenActivity();
-          connectSocket();
         });
         return;
       }
@@ -6612,7 +6001,6 @@
     if (persistBook) save({ keepStamp: true, quiet: true });
     if (loader) loader.classList.add('hidden');
     render();
-    connectSocket();
   }
 
   function frameLabel(frame) {

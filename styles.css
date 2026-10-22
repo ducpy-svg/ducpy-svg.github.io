@@ -1268,7 +1268,7 @@ html[data-frame="short"] .stat-grid,
 html[data-frame="short"] .hw-cards { grid-template-columns: 1fr; }
 
 @media print {
-  .decor, #loader, #toast, .savebar, .syncbox, #clockbox, #settingsbox, #previewbox, #bang-tip, #app, #gatebox, #mailbox, #mail-btn, #missed-btn, #missed-card, #noticebox, #socket-dot {
+  .decor, #loader, #toast, .savebar, .syncbox, #clockbox, #settingsbox, #previewbox, #bang-tip, #app, #gatebox, #noticebox {
     display: none !important;
   }
   #print-root { display: block !important; }
@@ -1310,37 +1310,6 @@ html[data-frame="short"] .hw-cards { grid-template-columns: 1fr; }
   box-shadow: 4px 4px 0 var(--shadow);
   padding: 8px 10px;
 }
-.mail-btn { bottom: 72px; }
-.socket-dot {
-  position: fixed;
-  z-index: 30;
-  right: 18px;
-  bottom: 18px;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 2px solid var(--line);
-  background: #94a3b8;
-}
-.socket-dot.is-on { background: #0f8a4b; }
-.socket-dot.is-wait { background: #e2b007; }
-.socket-dot.is-error { background: #d90429; }
-.missed-btn { bottom: 122px; background: #fff4d6; color: #3b2a08; border-color: #92400e; }
-.mailbox, .missed-card {
-  position: fixed;
-  z-index: 31;
-  right: 14px;
-  width: min(440px, calc(100% - 28px));
-  max-height: min(68vh, 640px);
-  overflow: auto;
-  background: var(--paper);
-  color: var(--ink);
-  border: 4px solid var(--line);
-  box-shadow: 6px 6px 0 var(--shadow);
-  padding: 12px;
-}
-.mailbox { bottom: 122px; }
-.missed-card { bottom: 176px; }
 .mail-head { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
 .mail-row, .notice-row {
   display: block;
