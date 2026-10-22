@@ -952,6 +952,19 @@ tr.hw-row-unavailable td.hw-rate { background: var(--paper2); color: var(--muted
 .pec-unknown { font-weight: 800; color: var(--muted); }
 .curriculum-table input, .curriculum-table select { min-width: 0; width: 100%; }
 .curriculum-table .checkline { justify-content: center; margin-bottom: 4px; }
+select.book-pick,
+span.book-pick { font-weight: 800; }
+span.book-pick { display: inline-block; padding: 2px 8px; border: 3px solid var(--line); }
+select.book-not-bought,
+option.book-not-bought,
+span.book-not-bought { background: #ffb3be; color: #6a040f; }
+select.book-issued-paid,
+option.book-issued-paid,
+span.book-issued-paid { background: #b7f0cf; color: #0d3b24; }
+select.book-issued-unpaid,
+option.book-issued-unpaid,
+span.book-issued-unpaid { background: #ffe08a; color: #3d2a00; }
+.staff-card .btn { margin-top: 8px; }
 .hw-note { color: #8a6a00; font-weight: 800; font-size: 12px; margin-top: 4px; text-align: center; }
 .hw-legend { margin-top: 12px; border: 3px solid var(--line); background: var(--paper2); padding: 8px 10px; }
 .hw-legend p { margin: 4px 0; }

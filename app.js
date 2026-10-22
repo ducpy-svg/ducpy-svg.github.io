@@ -2,7 +2,7 @@
   'use strict';
 
   var L = window.OceanLogic;
-  var APP_TITLE = 'Ocean EDU - Student management list (Unofficial) ver 1.4.0';
+  var APP_TITLE = 'Ocean EDU - Student management list (Unofficial) ver 1.4.1';
   var SUGGEST_URL = 'https://script.google.com/macros/s/AKfycbyNFHdMszhrmqyfXDHSDi2ti51y5_Ib3kiXgA5cGzcPkWLboUJSnPYJ5xwikb9N-fLOkg/exec';
   var PRIMARY_IDS = ['ocean', 'sky', 'teal', 'green', 'lime', 'amber', 'orange', 'coral', 'rose', 'violet', 'indigo', 'slate'];
   var SKIN_IDS = ['default', 'y2k', 'mcbling', 'indie', 'aero', 'minimal'];
@@ -153,11 +153,13 @@
         'Ocean EDU - Student management list (Unofficial) ver 1.3.6',
         'Ocean EDU - Student management list (Unofficial) ver 1.3.7',
         'Ocean EDU - Student management list (Unofficial) ver 1.3.8',
-        'Ocean EDU - Student management list (Unofficial) ver 1.3.9'
+        'Ocean EDU - Student management list (Unofficial) ver 1.3.9',
+        'Ocean EDU - Student management list (Unofficial) ver 1.4.0'
       ];
       if (!state.settings.title || legacyTitle.indexOf(state.settings.title) >= 0) state.settings.title = APP_TITLE;
       delete state.settings.supabaseUrl;
       delete state.settings.supabaseKey;
+      state.settings.scriptUrl = SUGGEST_URL;
       if (state.settings.theme !== 'night') state.settings.theme = 'day';
       if (PRIMARY_IDS.indexOf(state.settings.primary) < 0) state.settings.primary = 'ocean';
       state.classes = normalizeClasses(raw.classes);
@@ -1467,7 +1469,7 @@
       when = L.formatDMY(at) + ' ' + L.formatAmPm(at);
     }
     return '<div class="savebar"><span>Data được cập nhật lần cuối: ' + esc(when) + '</span>' +
-      '<button type="button" class="btn btn-danger" data-act="request-update">Yêu cầu cập nhật</button></div>';
+      '<button type="button" class="btn btn-danger" data-act="request-update">Cập nhật sổ tay</button></div>';
   }
 
   function currentWeekStats(filter) {
@@ -1996,6 +1998,22 @@
     return 'Chưa mua';
   }
 
+  function bookStatusClass(id) {
+    if (id === 'issued-paid') return 'book-issued-paid';
+    if (id === 'issued-unpaid') return 'book-issued-unpaid';
+    return 'book-not-bought';
+  }
+
+  function bookStatusOptions(selected) {
+    return L.BOOK_STATUS.map(function (item) {
+      return '<option class="' + bookStatusClass(item.id) + '" value="' + item.id + '"' + (selected === item.id ? ' selected' : '') + '>' + esc(item.label) + '</option>';
+    }).join('');
+  }
+
+  function bookStatusView(id) {
+    return '<span class="book-pick ' + bookStatusClass(id) + '">' + esc(bookStatusLabel(id)) + '</span>';
+  }
+
   function levelOptionLabel(level) {
     var grade = L.gradeById(level && level.gradeId);
     var book = L.curriculumName(grade);
@@ -2099,10 +2117,8 @@
     var rows = ordered.map(function (stu, index) {
       var rec = L.bookOf(stu, level);
       var bookCell = edit
-        ? '<select data-book data-id="' + esc(stu.id) + '">' + L.BOOK_STATUS.map(function (item) {
-          return '<option value="' + item.id + '"' + (rec.bookStatus === item.id ? ' selected' : '') + '>' + esc(item.label) + '</option>';
-        }).join('') + '</select>'
-        : esc(bookStatusLabel(rec.bookStatus));
+        ? '<select class="book-pick ' + bookStatusClass(rec.bookStatus) + '" data-book data-id="' + esc(stu.id) + '">' + bookStatusOptions(rec.bookStatus) + '</select>'
+        : bookStatusView(rec.bookStatus);
       return '<tr' + (isPausedStudent(stu) ? ' class="row-gray"' : '') + '><td>' + (index + 1) + '</td><td>' + esc(showText(stu.name)) + '</td><td>' + esc(showText(stu.englishName)) + '</td><td>' + esc(showText(stu.code)) + '</td><td>' + bookCell + '</td>' + curriculumPecCells(stu, rec, edit) + '</tr>';
     }).join('');
     var pastNote = level && level.to
@@ -2467,12 +2483,9 @@
         return noteRow(note.id, note.month, note.text);
       }).join('');
       var selfOn = bookRec.pecMode === 'self';
-      var bookPick = L.BOOK_STATUS.map(function (item) {
-        return '<option value="' + item.id + '"' + (bookRec.bookStatus === item.id ? ' selected' : '') + '>' + esc(item.label) + '</option>';
-      }).join('');
       body = '<label class="field"><span>Số điện thoại</span><input id="d-phone" value="' + esc(stu.phone) + '"></label>' +
         '<p class="help">Giáo trình hiện tại: ' + esc(bookName) + '. Cấp độ cũ sửa ở mục Xác nhận giáo trình.</p>' +
-        '<label class="field"><span>Mua sách</span><select id="d-book">' + bookPick + '</select></label>' +
+        '<label class="field"><span>Mua sách</span><select id="d-book" class="book-pick ' + bookStatusClass(bookRec.bookStatus) + '">' + bookStatusOptions(bookRec.bookStatus) + '</select></label>' +
         '<label class="checkline"><input type="checkbox" id="d-pec-self"' + (selfOn ? ' checked' : '') + '> Hv tự tạo</label>' +
         '<p class="field-label">Tài khoản PEC</p>' +
         '<input id="d-pec-user" value="' + esc(bookRec.pecUser) + '" autocomplete="off" spellcheck="false"' + (selfOn ? ' hidden' : '') + '>' +
@@ -2503,7 +2516,7 @@
         typeLine +
         '<br><b>First EC:</b> ' + esc(showText(stu.ec)) +
         '<br><b>Giáo trình:</b> ' + esc(bookName) +
-        '<br><b>Mua sách:</b> ' + esc(bookStatusLabel(bookRec.bookStatus)) +
+        '<br><b>Mua sách:</b> ' + bookStatusView(bookRec.bookStatus) +
         (bookRec.pecMode === 'self' ? '<br><b>PEC:</b> Hv tự tạo' : '') +
         '<br><b>Tài khoản PEC:</b> ' + pecUserView +
         '<br><b>Mật khẩu PEC:</b> ' + pecPassView + '</p>' + expireLine + noteLine +
@@ -3274,14 +3287,17 @@
   }
 
   function suggestForm() {
+    var user = ui.user || {};
     return modalShell('Đề xuất',
+      '<label class="field"><span>Mã nhân sự</span><input id="suggest-user" value="' + esc(user.username || '') + '" readonly></label>' +
+      '<label class="field"><span>Tên nhân sự</span><input id="suggest-name" value="' + esc(user.name || '') + '" readonly></label>' +
       '<label class="field"><span>Loại đề xuất</span><select id="suggest-type">' +
       '<option value="add">Add học viên</option>' +
       '<option value="transfer">Chuyển lớp</option>' +
       '<option value="other">Khác</option></select></label>' +
       '<label class="field"><span>Nội dung</span><textarea id="suggest-text" maxlength="1500"></textarea></label>' +
-      '<p class="help">Gửi lên Google Sheet. Username vào cột Mã nhân sự, tên hiển thị vào cột Tên nhân sự, nội dung vào cột Nội dung. Số thứ tự và thời gian do bảng tính ghi. Mỗi loại vào một thẻ riêng.</p>',
-      '<button type="button" class="btn btn-primary" data-act="suggest-send">Gửi</button><button type="button" class="btn" data-act="close-modal">Hủy</button>');
+      '<p class="help">Submit gửi lên Google Sheet. Mã nhân sự vào cột C, tên nhân sự vào cột D, nội dung vào cột E. Cột A số thứ tự và cột B thời gian do bảng tính tự ghi. Add học viên, Chuyển lớp và Khác vào ba thẻ riêng.</p>',
+      '<button type="button" class="btn btn-primary" data-act="suggest-send">Submit</button><button type="button" class="btn" data-act="close-modal">Hủy</button>');
   }
 
   function feedWhen(item) {
@@ -3524,7 +3540,45 @@
     if (ui.modal.type === 'add-soa') return soaForm();
     if (ui.modal.type === 'move-session') return moveForm();
     if (ui.modal.type === 'suggest') return suggestForm();
+    if (ui.modal.type === 'edit-staff') return staffForm();
     return '';
+  }
+
+  function staffForm() {
+    var name = ui.modal && ui.modal.name ? ui.modal.name : '';
+    var month = ui.modal && ui.modal.month ? ui.modal.month : staffMonthKey();
+    var row = (state.staffBook && state.staffBook[name]) || { code: '', soa: {} };
+    var soaValue = row.soa && row.soa[month] ? row.soa[month] : '';
+    return modalShell('Sửa thông tin giáo viên',
+      '<p class="meta">' + esc(name) + '</p>' +
+      '<label class="field"><span>Mã nhân sự</span><input id="staff-code" value="' + esc(row.code || '') + '" autocomplete="off"></label>' +
+      '<label class="field"><span>Giờ SOA tháng ' + esc(month) + '</span><input id="staff-soa" inputmode="decimal" value="' + esc(soaValue) + '"></label>' +
+      '<p class="help">Giờ Teaching của tháng này do lịch lớp tính, không sửa ở đây.</p>',
+      '<button type="button" class="btn btn-primary" data-act="save-staff">Lưu</button><button type="button" class="btn" data-act="close-modal">Hủy</button>');
+  }
+
+  function saveStaffInfo() {
+    if (deny(canEdit()) || !ui.modal || ui.modal.type !== 'edit-staff') return;
+    var name = ui.modal.name;
+    var month = ui.modal.month;
+    if (!name || !/^\d{4}-\d{2}$/.test(month || '')) return;
+    var codeEl = document.getElementById('staff-code');
+    var soaEl = document.getElementById('staff-soa');
+    if (!state.staffBook) state.staffBook = {};
+    if (!state.staffBook[name] || typeof state.staffBook[name] !== 'object') state.staffBook[name] = { code: '', soa: {} };
+    if (!state.staffBook[name].soa || typeof state.staffBook[name].soa !== 'object' || Array.isArray(state.staffBook[name].soa)) {
+      state.staffBook[name].soa = {};
+    }
+    state.staffBook[name].code = String(codeEl && codeEl.value || '').trim();
+    var soaValue = String(soaEl && soaEl.value || '').trim();
+    if (soaValue) state.staffBook[name].soa[month] = soaValue;
+    else delete state.staffBook[name].soa[month];
+    staffBookSeen = true;
+    ui.modal = null;
+    ui.formError = '';
+    save();
+    toast('Đã lưu thông tin giáo viên.');
+    render();
   }
 
   function sweepRoster() {
@@ -3560,21 +3614,20 @@
       var row = (state.staffBook && state.staffBook[name]) || { code: '', soa: {} };
       var minutes = L.teachingMinutes(state.classes, name, month);
       var soaValue = row.soa && row.soa[month] ? row.soa[month] : '';
-      var code = canEdit()
-        ? '<label class="field"><span>Mã nhân sự</span><input data-staff-code data-name="' + esc(name) + '" value="' + esc(row.code || '') + '" autocomplete="off"></label>'
-        : '<p>Mã nhân sự: ' + esc(row.code || '—') + '</p>';
-      var soa = canEdit()
-        ? '<label class="field"><span>Giờ SOA (giờ OFFICE)</span><input data-staff-soa data-name="' + esc(name) + '" data-month="' + esc(month) + '" inputmode="decimal" value="' + esc(soaValue) + '"></label>'
-        : '<p>Giờ SOA: ' + esc(soaValue || '—') + '</p>';
-      return '<article class="staff-card"><h3>' + esc(name) + '</h3><p class="meta">FET</p>' + code +
-        '<p class="staff-hours">Giờ Teaching: <b>' + esc(L.formatHours(minutes)) + '</b></p>' + soa + '</article>';
+      var editBtn = canEdit()
+        ? '<button type="button" class="btn" data-act="edit-staff" data-name="' + esc(name) + '">Sửa thông tin</button>'
+        : '';
+      return '<article class="staff-card"><h3>' + esc(name) + '</h3><p class="meta">FET</p>' +
+        '<p>Mã nhân sự: ' + esc(row.code || '—') + '</p>' +
+        '<p class="staff-hours">Giờ Teaching: <b>' + esc(L.formatHours(minutes)) + '</b></p>' +
+        '<p>Giờ SOA: ' + esc(soaValue || '—') + '</p>' + editBtn + '</article>';
     }).join('');
     return shell('<div class="section-head"><div><button type="button" class="btn" data-act="nav" data-screen="menu">← Menu</button>' +
       '<h2>Công giáo viên</h2><p class="meta">Mục H</p></div></div>' +
       '<label class="field dash-month"><span>Tháng</span><input id="staff-month" type="month" value="' + esc(month) + '"></label>' +
-      '<p class="help">Giờ Teaching cộng mỗi buổi trong tháng theo khung giờ của lớp. Một buổi 5:30–7:30 là 2 giờ, tháng cộng mọi buổi của giáo viên đó. Giờ SOA là giờ OFFICE, Admin nhập theo tháng. Khối Interview, event và Lớp EB trên lịch Mục B là thẻ riêng, không cộng vào ô này và không tính giờ Teaching. Mã nhân sự do Admin cập nhật.</p>' +
+      '<p class="help">Giờ Teaching cộng mỗi buổi trong tháng theo khung giờ của lớp. Một buổi 5:30–7:30 là 2 giờ, tháng cộng mọi buổi của giáo viên đó. Giờ SOA là giờ OFFICE. Admin bấm Sửa thông tin để cập nhật mã nhân sự và giờ SOA của tháng đang xem. Khối Interview, event và Lớp EB trên lịch Mục B là thẻ riêng, không cộng vào ô này và không tính giờ Teaching.</p>' +
       (canEdit() ? '' : '<p class="help">Tài khoản này chỉ xem công giáo viên.</p>') +
-      '<div class="staff-grid-cards">' + (cards || '<p class="muted">Chưa có FET.</p>') + '</div>');
+      '<div class="staff-grid-cards">' + (cards || '<p class="muted">Chưa có FET.</p>') + '</div>' + modalHtml());
   }
 
   function render() {
@@ -4818,7 +4871,7 @@
     if (!panel) return;
     if (!canEdit()) { panel.innerHTML = ''; return; }
     panel.innerHTML = '<h3>Đề xuất</h3>' +
-      '<p class="help">Form đề xuất và nút yêu cầu cập nhật gửi lên Google Sheet. Add học viên, Chuyển lớp và Khác vào ba thẻ tương ứng.</p>' +
+      '<p class="help">Form đề xuất dùng ứng dụng web đã triển khai. Không dán mã Apps Script trong cài đặt. Admin gắn bảng tính với ứng dụng web này bằng tay trên Google. Add học viên, Chuyển lớp và Khác vào ba thẻ. Nút Cập nhật sổ tay ghi vào thẻ Khác.</p>' +
       '<p class="deploy-url">' + esc(SUGGEST_URL) + '</p>' +
       '<h3>Bản data dùng chung</h3>' +
       '<p class="help">' + esc(classNote) + '</p>' +
@@ -5000,7 +5053,8 @@
       'archive-purge': 1, 'do-archive-purge': 1, 'rejoin-pick': 1,
       'new-account': 1, 'edit-account': 1, 'delete-account': 1,
       'download-data': 1, 'download-classes': 1, 'pick-folder': 1,
-      'drop-image': 1, 'open-soa': 1, 'soa-drop': 1
+      'drop-image': 1, 'open-soa': 1, 'soa-drop': 1,
+      'edit-staff': 1, 'save-staff': 1
     };
     var studentActs = {
       'bulk-transfer': 1, 'confirm-transfer': 1, 'transfer-pick': 1,
@@ -5144,6 +5198,13 @@
       return;
     }
     if (act === 'suggest-send') { sendSuggestion(); return; }
+    if (act === 'edit-staff') {
+      ui.formError = '';
+      ui.modal = { type: 'edit-staff', name: btn.getAttribute('data-name') || '', month: staffMonthKey() };
+      render();
+      return;
+    }
+    if (act === 'save-staff') { saveStaffInfo(); return; }
     if (act === 'drop-image') {
       var postBox = document.getElementById('post-text');
       ui.postDraft = postBox ? postBox.value : ui.postDraft;
@@ -5694,6 +5755,10 @@
     if (t.id === 'curriculum-level') {
       ui.curriculumLevel = t.value;
       render();
+      return;
+    }
+    if (t.id === 'd-book') {
+      t.className = 'book-pick ' + bookStatusClass(t.value);
       return;
     }
     if (t.id === 'd-pec-self') {
