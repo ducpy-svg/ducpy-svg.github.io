@@ -79,9 +79,13 @@
     g('teens-2b', 'TEENS', 'TEENS 2B', 'std', '2B', 36),
     g('pre-ielts', 'IELTS', 'Pre-IELTS', 'preielts', '', 36),
     g('ielts-40', 'IELTS', 'IELTS 4.0', 'std', '4.0', 36),
+    g('ielts-45', 'IELTS', 'IELTS 4.5', 'std', '4.5', 36),
     g('ielts-50', 'IELTS', 'IELTS 5.0', 'std', '5.0', 36),
+    g('ielts-55', 'IELTS', 'IELTS 5.5', 'std', '5.5', 36),
     g('ielts-60', 'IELTS', 'IELTS 6.0', 'std', '6.0', 36),
+    g('ielts-65', 'IELTS', 'IELTS 6.5', 'std', '6.5', 36),
     g('ielts-70', 'IELTS', 'IELTS 7.0', 'std', '7.0', 36),
+    g('ielts-75', 'IELTS', 'IELTS 7.5', 'std', '7.5', 36),
     g('ielts-80', 'IELTS', 'IELTS 8.0', 'std', '8.0', 36)
   ];
 
@@ -1512,21 +1516,50 @@
     return !!(stu && (stu.status === 'stopped' || stu.expireKind === 'stop'));
   }
 
-  function curriculumName(grade) {
+  function focusRank(item) {
+    if (!item) return '';
+    if (item.id === 'teens-1a') return '1';
+    if (item.id === 'teens-1b') return '2';
+    if (item.id === 'teens-2a') return '3';
+    if (item.id === 'teens-2b') return '4';
+    return '';
+  }
+
+  function bookPair(name, price) {
+    return { name: name, price: price };
+  }
+
+  function curriculumBooks(grade) {
     var item = grade && grade.id ? grade : gradeById(grade);
-    if (!item) return '?';
-    if (item.id === 'pre-kindy-a') return 'Little Learning Star A';
-    if (item.id === 'pre-kindy-b') return 'Little Learning Star B';
-    if (item.track === 'KINDY' && item.form === 'std') return 'Disney ' + item.code;
-    if (item.id === 'pre-kids-a') return 'English Code starter A';
-    if (item.id === 'pre-kids-b') return 'English Code starter B';
-    if (item.track === 'KIDS' && item.form === 'std') return 'English Code ' + item.code;
-    if (item.id === 'teens-1a') return 'Focus 1';
-    if (item.id === 'teens-1b') return 'Focus 2';
-    if (item.id === 'teens-2a') return 'Focus 3';
-    if (item.id === 'teens-2b') return 'Focus 4';
-    if (item.id === 'pre-ielts') return 'Focus on IELTS';
-    return '?';
+    if (!item) return [];
+    if (item.id === 'pre-kindy-a') return [bookPair('Little Learning Star A', 150000)];
+    if (item.id === 'pre-kindy-b') return [bookPair('Little Learning Star B', 150000)];
+    if (item.track === 'KINDY' && item.form === 'std') return [bookPair('Disney ' + item.code, 250000)];
+    if (item.id === 'pre-kids-a') return [bookPair('English Code starter A', 210000)];
+    if (item.id === 'pre-kids-b') return [bookPair('English Code starter B', 210000)];
+    if (item.track === 'KIDS' && item.form === 'std') return [bookPair('English Code ' + item.code, 220000)];
+    var focus = focusRank(item);
+    if (focus) {
+      return [
+        bookPair('FOCUS ' + focus + ' Coursebook', 320000),
+        bookPair('FOCUS ' + focus + ' Workbook', 250000)
+      ];
+    }
+    if (item.id === 'pre-ielts') return [bookPair('Focus on IELTS', 350000)];
+    if (item.id === 'ielts-40') return [bookPair('Focus on IELTS Foundation Coursebook', 340000)];
+    if (item.track === 'IELTS' && item.form === 'std') return [bookPair('IELTS Expert ' + item.code, 299000)];
+    return [];
+  }
+
+  function curriculumName(grade) {
+    var books = curriculumBooks(grade);
+    if (!books.length) return '?';
+    return books.map(function (book) { return book.name; }).join(' · ');
+  }
+
+  function formatVnd(amount) {
+    var n = Math.round(Number(amount) || 0);
+    return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + 'đ';
   }
 
   var BOOK_STATUS = [
@@ -1540,12 +1573,34 @@
     return String(level.gradeId || '') + '|' + String(level.from || '');
   }
 
+  function cleanBookStatus(value) {
+    if (value === 'issued-paid' || value === 'issued-unpaid' || value === 'not-bought') return value;
+    return 'not-bought';
+  }
+
   function normalizeBook(bag) {
-    var status = bag && bag.bookStatus;
-    if (status !== 'issued-paid' && status !== 'issued-unpaid') status = 'not-bought';
     var self = !!(bag && bag.pecMode === 'self');
+    var books = [];
+    if (bag && Array.isArray(bag.books)) {
+      bag.books.forEach(function (item, index) {
+        if (index > 1 || !item) return;
+        books.push({
+          status: cleanBookStatus(item.status || item.bookStatus),
+          statusAt: item.statusAt ? String(item.statusAt) : ''
+        });
+      });
+    }
+    if (!books.length) {
+      books.push({
+        status: cleanBookStatus(bag && bag.bookStatus),
+        statusAt: bag && bag.bookStatusAt ? String(bag.bookStatusAt) : ''
+      });
+    }
+    while (books.length < 2) books.push({ status: 'not-bought', statusAt: '' });
     return {
-      bookStatus: status,
+      bookStatus: books[0].status,
+      bookStatusAt: books[0].statusAt,
+      books: books.slice(0, 2),
       pecMode: self ? 'self' : '',
       pecUser: self ? '' : String((bag && bag.pecUser) || ''),
       pecPass: self ? '' : String((bag && bag.pecPass) || '')
@@ -1562,7 +1617,168 @@
   }
 
   function bookBought(rec) {
-    return !!(rec && (rec.bookStatus === 'issued-paid' || rec.bookStatus === 'issued-unpaid'));
+    if (!rec) return false;
+    var books = rec.books || [];
+    for (var i = 0; i < books.length; i++) {
+      var status = books[i] && books[i].status;
+      if (status === 'issued-paid' || status === 'issued-unpaid') return true;
+    }
+    return rec.bookStatus === 'issued-paid' || rec.bookStatus === 'issued-unpaid';
+  }
+
+  function inMonth(iso, key) {
+    if (!iso || !key) return false;
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return false;
+    return monthKey(d) === key;
+  }
+
+  function curriculumMonthStats(classes, key) {
+    var soldStudents = 0;
+    var soldBooks = 0;
+    var revenue = 0;
+    var unpaid = 0;
+    var unpaidRevenue = 0;
+    var debtBooks = 0;
+    var debtRevenue = 0;
+    var byCm = {};
+    (classes || []).forEach(function (cls) {
+      var cmName = String(cls && cls.cm || '').trim() || '?';
+      if (!byCm[cmName]) {
+        byCm[cmName] = {
+          cm: cmName,
+          soldStudents: 0,
+          soldBooks: 0,
+          revenue: 0,
+          unpaid: 0,
+          unpaidRevenue: 0,
+          debtBooks: 0,
+          debtRevenue: 0
+        };
+      }
+      var bucket = byCm[cmName];
+      var levels = cls && cls.levelHistory && cls.levelHistory.length ? cls.levelHistory : [currentLevel(cls)];
+      (cls && cls.students || []).forEach(function (stu) {
+        var studentPaid = false;
+        levels.forEach(function (level) {
+          if (!level) return;
+          var catalog = curriculumBooks(level.gradeId);
+          if (!catalog.length) return;
+          var rec = bookOf(stu, level);
+          catalog.forEach(function (book, index) {
+            var slot = rec.books && rec.books[index] ? rec.books[index] : null;
+            if (!slot) return;
+            if (slot.status === 'issued-unpaid') {
+              debtBooks += 1;
+              debtRevenue += book.price;
+              bucket.debtBooks += 1;
+              bucket.debtRevenue += book.price;
+            }
+            if (!inMonth(slot.statusAt, key)) return;
+            if (slot.status === 'issued-paid') {
+              soldBooks += 1;
+              revenue += book.price;
+              bucket.soldBooks += 1;
+              bucket.revenue += book.price;
+              studentPaid = true;
+            } else if (slot.status === 'issued-unpaid') {
+              unpaid += 1;
+              unpaidRevenue += book.price;
+              bucket.unpaid += 1;
+              bucket.unpaidRevenue += book.price;
+            }
+          });
+        });
+        if (studentPaid) {
+          soldStudents += 1;
+          bucket.soldStudents += 1;
+        }
+      });
+    });
+    var cms = Object.keys(byCm).map(function (name) { return byCm[name]; });
+    cms.sort(function (a, b) { return a.cm.localeCompare(b.cm, 'vi'); });
+    return {
+      soldStudents: soldStudents,
+      soldBooks: soldBooks,
+      revenue: revenue,
+      unpaid: unpaid,
+      unpaidRevenue: unpaidRevenue,
+      debtBooks: debtBooks,
+      debtRevenue: debtRevenue,
+      cms: cms
+    };
+  }
+
+  function curriculumFresh(classes, now) {
+    var when = now instanceof Date ? now : new Date(now || Date.now());
+    var key = monthKey(when);
+    var found = false;
+    (classes || []).forEach(function (cls) {
+      if (found || !cls || cls.kind === 'custom') return;
+      var history = cls.levelHistory || [];
+      if (history.length < 2) return;
+      var latest = history[history.length - 1];
+      if (!latest || latest.to || !latest.from) return;
+      var from = new Date(latest.from);
+      if (isNaN(from.getTime()) || monthKey(from) !== key) return;
+      var catalog = curriculumBooks(latest.gradeId);
+      var count = catalog.length || 1;
+      var registered = false;
+      (cls.students || []).forEach(function (stu) {
+        if (registered) return;
+        var rec = bookOf(stu, latest);
+        for (var i = 0; i < count; i++) {
+          var slot = rec.books && rec.books[i];
+          if (slot && slot.status && slot.status !== 'not-bought') registered = true;
+        }
+      });
+      if (!registered) found = true;
+    });
+    return found;
+  }
+
+  function classFace(cls) {
+    if (!cls) return '';
+    if (cls.kind === 'custom') {
+      var custom = String(cls.customName || '').trim();
+      if (custom) return custom;
+    }
+    var grade = gradeById(cls.gradeId);
+    var label = grade ? grade.label : '';
+    var num = cls.number == null ? '' : String(cls.number);
+    var face = (label + (num ? ' ' + num : '')).trim();
+    return face || currentName(cls);
+  }
+
+  function transferReport(fromCls, toCls, students, when) {
+    var date = formatDMY(when);
+    var fromLine = classFace(fromCls) + ' ' + currentName(fromCls);
+    var toLine = classFace(toCls) + ' ' + currentName(toCls);
+    var fromSched = scheduleText(fromCls);
+    var toSched = scheduleText(toCls);
+    return (students || []).map(function (stu) {
+      return [
+        'CN Phúc Yên đề xuất chuyển lớp học viên:',
+        '- Tên học viên: ' + String(stu && stu.name || ''),
+        '- Mã học viên: ' + String(stu && stu.code || ''),
+        '- Lớp hiện tại: ' + fromLine,
+        '- Lịch học: ' + fromSched,
+        'Chuyển sang lớp mới: ' + toLine,
+        '- Lịch học lớp mới: ' + toSched,
+        '- Bắt đầu từ ngày: ' + date
+      ].join('\n');
+    }).join('\n\n');
+  }
+
+  function feeReport(students, books, when) {
+    var lines = ['Danh sách học viên chuyển phí ' + formatDMY(when)];
+    (students || []).forEach(function (stu, index) {
+      lines.push((index + 1) + '. Học viên: ' + String(stu && stu.name || '') + ' - ' + String(stu && stu.code || ''));
+      (books || []).forEach(function (book) {
+        lines.push('Tên sách: ' + book.name + ' - ' + formatVnd(book.price));
+      });
+    });
+    return lines.join('\n');
   }
 
   function pecReady(rec) {
@@ -1673,19 +1889,36 @@
     return 'HV' + String(max + 1).padStart(4, '0');
   }
 
+  function codeKey(code) {
+    var text = String(code == null ? '' : code).trim();
+    if (!text || text === '-' || text === '?') return '';
+    return text;
+  }
+
   function codeTaken(classes, code, exceptId, archive) {
-    var text = String(code || '').trim();
-    if (!text || text === '-' || text === '?') return false;
+    var text = codeKey(code);
+    if (!text) return false;
     var found = false;
     (classes || []).forEach(function (cls) {
       (cls.students || []).forEach(function (stu) {
-        if (stu.id !== exceptId && stu.code === code) found = true;
+        if (stu && stu.id !== exceptId && codeKey(stu.code) === text) found = true;
       });
     });
     (archive || []).forEach(function (stu) {
-      if (stu && archiveKeepsCode(stu) && stu.id !== exceptId && stu.code === code) found = true;
+      if (stu && archiveKeepsCode(stu) && stu.id !== exceptId && codeKey(stu.code) === text) found = true;
     });
     return found;
+  }
+
+  function classJustUpdated(cls, now) {
+    var stamp = cls && cls.updatedAt;
+    if (!stamp) return false;
+    var at = new Date(stamp).getTime();
+    if (!isFinite(at)) return false;
+    var when = now instanceof Date ? now : new Date(now || Date.now());
+    var ms = when.getTime();
+    if (!isFinite(ms)) return false;
+    return ms - at < 2 * 86400000;
   }
 
   var STUDENT_COLUMNS = [
@@ -1883,25 +2116,58 @@
     return patch;
   }
 
+  function findOfficialTwins(classes, name, exceptClassId, code, now) {
+    var nameKey = usableNameKey(name);
+    var wanted = codeKey(code);
+    if (!nameKey && !wanted) return [];
+    var when = now instanceof Date ? now : new Date(now || Date.now());
+    var hits = [];
+    var seen = {};
+    (classes || []).forEach(function (host) {
+      if (!host || host.id === exceptClassId) return;
+      (host.students || []).forEach(function (stu) {
+        if (!stu || seen[stu.id] || stu.status === 'stopped') return;
+        if (enrollOf(stu) !== 'official') return;
+        if (studentPhase(host, stu, when).kind !== 'listed') return;
+        var byName = !!(nameKey && usableNameKey(stu.name) === nameKey);
+        var byCode = !!(wanted && codeKey(stu.code) === wanted);
+        if (!byName && !byCode) return;
+        seen[stu.id] = true;
+        hits.push({
+          id: stu.id,
+          fromId: host.id,
+          name: stu.name || '',
+          code: codeKey(stu.code),
+          className: currentName(host),
+          joined: stu.joinedAt || '',
+          by: byName && byCode ? 'both' : (byCode ? 'code' : 'name')
+        });
+      });
+    });
+    return hits;
+  }
+
   function rowsToClassUpdate(cls, rows, classes, archive) {
     var students = [];
     var updates = [];
     var errors = [];
+    var links = [];
     var taken = {};
     var owners = {};
+    var linkedIds = {};
     (classes || []).forEach(function (host) {
       (host.students || []).forEach(function (stu) {
-        if (stu && stu.code && stu.code !== '-' && stu.code !== '?') {
-          taken[stu.code] = stu.id;
-          owners[stu.code] = stu.id;
-        }
+        var key = codeKey(stu && stu.code);
+        if (!key) return;
+        taken[key] = stu.id;
+        owners[key] = stu.id;
       });
     });
     (archive || []).forEach(function (stu) {
       if (!stu || !archiveKeepsCode(stu)) return;
-      if (!stu.code || stu.code === '-' || stu.code === '?') return;
-      if (taken[stu.code]) return;
-      taken[stu.code] = stu.id;
+      var key = codeKey(stu.code);
+      if (!key || taken[key]) return;
+      taken[key] = stu.id;
     });
     var byName = {};
     var patched = {};
@@ -1957,7 +2223,42 @@
         Object.keys(patch).forEach(function (item) { patched[target.id][item] = patch[item]; });
         continue;
       }
-      var code = fields.code;
+      var typedCode = fields.code;
+      var localOwner = null;
+      if (typedCode) {
+        (cls.students || []).forEach(function (stu) {
+          if (!localOwner && codeKey(stu && stu.code) === typedCode) localOwner = stu;
+        });
+      }
+      if (localOwner) {
+        errors.push('Hàng ' + line + ': trùng mã ' + typedCode + '. Mã này đang của ' + (localOwner.name || 'học viên') + ' trong lớp này.');
+        continue;
+      }
+      var hits = findOfficialTwins(classes, name, cls && cls.id, typedCode, new Date());
+      if (hits.length) {
+        var repeated = hits.some(function (hit) { return linkedIds[hit.id]; });
+        if (repeated) {
+          errors.push('Hàng ' + line + ': trùng học viên đang học ở lớp khác, đã nằm ở hàng trước.');
+          continue;
+        }
+        hits.forEach(function (hit) { linkedIds[hit.id] = true; });
+        links.push({
+          line: line,
+          hits: hits,
+          student: {
+            code: typedCode || '',
+            name: name,
+            englishName: fields.englishName || '?',
+            gender: fields.gender || '?',
+            dob: fields.dob || '?',
+            phone: fields.phone || '?',
+            ec: fields.ec || '?',
+            enroll: 'official'
+          }
+        });
+        continue;
+      }
+      var code = typedCode;
       if (!code) code = nextFreeCode(classes || [], taken);
       if (taken[code]) {
         if (owners[code]) errors.push('Hàng ' + line + ': trùng mã ' + code + '.');
@@ -1965,6 +2266,7 @@
         continue;
       }
       taken[code] = 'new';
+      owners[code] = 'new';
       students.push({
         code: code,
         name: name,
@@ -1983,7 +2285,7 @@
       (cls.students || []).forEach(function (item) { if (item.id === id) stu = item; });
       updates.push({ id: id, name: stu ? stu.name : '', patch: patch });
     });
-    return { students: students, updates: updates, errors: errors };
+    return { students: students, updates: updates, errors: errors, links: links };
   }
 
   function attendanceSessions(cls) {
@@ -3369,12 +3671,19 @@
     homeworkRate: homeworkRate,
     homeworkLevel: homeworkLevel,
     attendanceUnavailable: attendanceUnavailable,
+    curriculumBooks: curriculumBooks,
     curriculumName: curriculumName,
+    formatVnd: formatVnd,
     BOOK_STATUS: BOOK_STATUS,
     levelKey: levelKey,
     normalizeBook: normalizeBook,
     bookOf: bookOf,
     bookBought: bookBought,
+    curriculumMonthStats: curriculumMonthStats,
+    curriculumFresh: curriculumFresh,
+    classFace: classFace,
+    transferReport: transferReport,
+    feeReport: feeReport,
     pecReady: pecReady,
     homeworkGroups: homeworkGroups,
     homeworkBoard: homeworkBoard,
@@ -3382,6 +3691,9 @@
     HW_STATUS: HW_STATUS,
     nextStudentCode: nextStudentCode,
     codeTaken: codeTaken,
+    codeKey: codeKey,
+    findOfficialTwins: findOfficialTwins,
+    classJustUpdated: classJustUpdated,
     STUDENT_COLUMNS: STUDENT_COLUMNS,
     parseImportDate: parseImportDate,
     normalizeGender: normalizeGender,

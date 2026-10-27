@@ -2,10 +2,58 @@
   'use strict';
 
   var L = window.OceanLogic;
-  var APP_TITLE = 'Ocean EDU - Student management list (Unofficial) ver 1.4.1';
+  var APP_TITLE = 'Ocean EDU - Student management list (Unofficial) ver 1.4.6';
   var SUGGEST_URL = 'https://script.google.com/macros/s/AKfycbyNFHdMszhrmqyfXDHSDi2ti51y5_Ib3kiXgA5cGzcPkWLboUJSnPYJ5xwikb9N-fLOkg/exec';
   var PRIMARY_IDS = ['ocean', 'sky', 'teal', 'green', 'lime', 'amber', 'orange', 'coral', 'rose', 'violet', 'indigo', 'slate'];
-  var SKIN_IDS = ['default', 'y2k', 'mcbling', 'indie', 'aero', 'minimal'];
+  var SKIN_BOOK = [
+    {
+      id: 'a2000',
+      title: 'Aesthetic 2000s',
+      lead: 'Các giao diện đang có, gom một nhóm. Bấm một tên để đổi cả sổ tay. Khung xem trước đổi theo mục đang trỏ.',
+      items: [
+        { id: 'default', name: 'Default', text: 'Sổ tay gốc: nền sóng biển, khung đậm và chữ rõ. Bảng màu cố định, không còn chỉnh màu.' },
+        { id: 'y2k', name: 'Y2K', text: 'Lưới cyan, kim loại và khung vuông của máy tính đời đầu.' },
+        { id: 'mcbling', name: 'McBling', text: 'Nhung hồng, viền vàng và chữ serif bóng.' },
+        { id: 'aero', name: 'Frutiger Aero', text: 'Kính bóng, xanh trời và giọt nước trong.' },
+        { id: 'preppy', name: '2000s Preppy', text: 'Kẻ học đường, navy và đỏ rượu, chữ serif.' },
+        { id: 'goth', name: 'Mall Goth', text: 'Đen, tím và đỏ đô, viền kép.' },
+        { id: 'fantasy', name: 'Fantasy2K', text: 'Vàng đồng, cánh tiên và khung mềm.' }
+      ]
+    },
+    {
+      id: 'd2010',
+      title: 'Diversity 2010s',
+      lead: 'Bốn hướng 2010. Mỗi hướng giữ một chất liệu riêng.',
+      items: [
+        { id: 'aerox', name: 'Frutiger Aero extra', text: 'Quả cầu kính 3D bóng, bể cá nhiệt đới, cá heo số và kiểu Web 2.0 giả chất liệu. Bóng bẩy, nước và bong bóng thủy tinh.' },
+        { id: 'vapor', name: 'Vaporwave', text: 'Màn hình Windows 98, lưới hoàng hôn hồng neon và teal. Hệ điều hành cũ, lưới 3D và nỗi hoài cổ.' },
+        { id: 'indie', name: 'Tumblr Hipster / Indie Sleaze', text: 'Cắt dán, ảnh flash tương phản cao và họa tiết thiên hà.' },
+        { id: 'seapunk', name: 'Seapunk', text: 'Xanh nước biển pha hồng neon, cá heo, biểu tượng âm dương và đại dương kỹ thuật số.' }
+      ]
+    },
+    {
+      id: 'd2020',
+      title: 'Post-modernized 2020s',
+      lead: 'Mười một hướng 2020, từ đồng quê và học thuật tới chữ lớn, khối 3D và neon.',
+      items: [
+        { id: 'cottage', name: 'Cottagecore', text: 'Đồng quê mơ mộng, tự cung tự cấp, làm bánh, thêu và họa tiết hoa. Bình yên, thoát nhịp đô thị.' },
+        { id: 'academia', name: 'Dark Academia', text: 'Văn học cổ, kiến trúc Gothic, trường đại học xưa. Nâu đất, đen, xanh rêu và sự say mê tri thức.' },
+        { id: 'goblin', name: 'Goblincore', text: 'Góc lộn xộn và hoang dã: nấm, bùn, ếch, xương và đồ nhặt nhỏ. Gồm cả Gremlincore, đối lập vẻ bóng của Cottagecore.' },
+        { id: 'lightac', name: 'Light Academia', text: 'Bản sáng, ấm và lãng mạn của Dark Academia. Kem, trắng, ánh nắng và thư viện.' },
+        { id: 'neo2k', name: 'Y2K / Neo-Nostalgia', text: 'Văn hóa cuối thập niên 90 và đầu 2000 trở lại: kim loại crôm, giao diện điện tử đời đầu và thời trang alt-TikTok.' },
+        { id: 'realism', name: '3D và hiện thực ảo', text: 'Khối 3D bồng bềnh, sống động, nằm dày trên khung và nền.' },
+        { id: 'dark', name: 'Chế độ hiển thị tối', text: 'Nền tối kiểu iOS 13 và Android Q. Tối giản, dịu mắt.' },
+        { id: 'classic', name: 'Sắc xanh cổ điển', text: 'Classic Blue của Pantone năm 2020. Trầm, tin cậy và bình yên.' },
+        { id: 'disrupt', name: 'Kiểu chữ phóng đại', text: 'Chữ khổng lồ và bố cục phá lưới. Nội dung vẫn đọc được.' },
+        { id: 'collage', name: 'Cắt dán kỹ thuật số', text: 'Ảnh, nét nguệch ngoạc và mảng vector chồng lên nhau. Cảm giác thủ công.' },
+        { id: 'cyber', name: 'Cyberpunk và neon', text: 'Khoa học viễn tưởng và thành phố tương lai. Neon rực đối lập trên nền tối. Chữ nhỏ giữ màu sáng, không dùng hồng neon làm chữ.' }
+      ]
+    }
+  ];
+  var SKIN_IDS = [];
+  SKIN_BOOK.forEach(function (group) {
+    group.items.forEach(function (item) { SKIN_IDS.push(item.id); });
+  });
   var STORAGE = 'oceanEdu.v1';
   var DATA_FILE = 'ocean-edu-data.json';
   var CLASS_FILE = 'ocean-edu-classes.json';
@@ -56,6 +104,15 @@
     sending: false,
     curriculumId: null,
     curriculumLevel: '',
+    curriculumMonth: '',
+    curriculumCmOpen: false,
+    curriculumLayout: 'cards',
+    curriculumSort: 'level',
+    curriculumQuery: '',
+    bookPick: {},
+    bookFold: '',
+    skinFold: '',
+    skinPeek: '',
     dashMonth: '',
     archivePick: {},
     examId: null,
@@ -67,7 +124,11 @@
     missedAt: 0,
     noticeMonth: '',
     suggest: { type: 'transfer' },
-    rejectId: ''
+    rejectId: '',
+    classLayout: 'cards',
+    classSort: 'level',
+    classQuery: '',
+    dict: { query: '', status: '', message: '', tab: 'mean', entry: null, suggestions: [] }
   };
 
   var droppedArchive = [];
@@ -88,10 +149,14 @@
   var preview = { scale: 1, x: 0, y: 0, pointers: {}, lastDist: 0 };
   var localRaw = {};
   var savePaused = true;
+  var bookEntered = false;
   var persistBook = false;
   var dataNote = 'Chưa đọc file data trên bản web.';
   var classNote = 'Chưa đọc file lớp, học viên và chuyên cần.';
   var lastClassJson = null;
+  var lastClassDiskBody = null;
+  var classShareAt = '';
+  var skinSwapTimer = null;
   var folderAsked = false;
   var syncWarned = false;
   var syncTimer = null;
@@ -154,7 +219,13 @@
         'Ocean EDU - Student management list (Unofficial) ver 1.3.7',
         'Ocean EDU - Student management list (Unofficial) ver 1.3.8',
         'Ocean EDU - Student management list (Unofficial) ver 1.3.9',
-        'Ocean EDU - Student management list (Unofficial) ver 1.4.0'
+        'Ocean EDU - Student management list (Unofficial) ver 1.4.0',
+        'Ocean EDU - Student management list (Unofficial) ver 1.4.1',
+        'Ocean EDU - Student management list (Unofficial) ver 1.4.2',
+        'Ocean EDU - Student management list (Unofficial) ver 1.4.3',
+        'Ocean EDU - Student management list (Unofficial) ver 1.4.4',
+        'Ocean EDU - Student management list (Unofficial) ver 1.4.5 demo',
+        'Ocean EDU - Student management list (Unofficial) ver 1.4.5v2'
       ];
       if (!state.settings.title || legacyTitle.indexOf(state.settings.title) >= 0) state.settings.title = APP_TITLE;
       delete state.settings.supabaseUrl;
@@ -391,7 +462,9 @@
   var shareActivity = false;
 
   function shareStamp(file) {
-    var iso = file && file.settings && file.settings.savedAt ? file.settings.savedAt : (file && file.savedAt);
+    var iso = file && file.settings && file.settings.savedAt
+      ? file.settings.savedAt
+      : (file && (file.shareAt || file.savedAt));
     var time = Date.parse(iso || '');
     return isNaN(time) ? 0 : time;
   }
@@ -618,6 +691,7 @@
         }
       }
       lastClassJson = JSON.stringify(state.classes);
+      lastClassDiskBody = classDiskBody();
     }).catch(function () {});
   }
 
@@ -636,14 +710,25 @@
     classFileSeen = true;
     var incomingStamp = Date.parse(file.savedAt || '') || 0;
     var currentStamp = classStamp(state.settings);
-    if (classListScore(state.classes) > 0 && incomingStamp <= currentStamp) {
+    var incomingScore = classListScore(incoming);
+    var currentScore = classListScore(state.classes);
+    if (currentScore > 0 && incomingStamp < currentStamp) {
       if (!classAdopted) classNote = 'Máy này đang giữ lớp, học viên và chuyên cần mới hơn file ocean-edu-classes.json.';
       return;
     }
+    if (currentScore > 0 && incomingStamp === currentStamp && incomingScore <= currentScore) {
+      if (!classAdopted) classNote = 'Máy này đang giữ lớp, học viên và chuyên cần mới hơn file ocean-edu-classes.json.';
+      return;
+    }
+    var sameStamp = currentScore > 0 && incomingStamp === currentStamp;
     state.classes = normalizeClasses(incoming);
     state.settings.classesSavedAt = file.savedAt || state.settings.classesSavedAt || '';
     persistBook = true;
     classAdopted = true;
+    if (sameStamp) {
+      classNote = 'Đã hoàn lại danh sách lớp từ ocean-edu-classes.json vì file này đủ hơn bản đang mở.';
+      return;
+    }
     classNote = fromFolder
       ? 'Đã đọc ocean-edu-classes.json trong thư mục Index local. Lớp, học viên, chuyên cần và thông tin học viên lấy từ file này.'
       : 'Đã đọc ocean-edu-classes.json. Lớp, học viên và chuyên cần lấy từ file này.';
@@ -663,6 +748,17 @@
     return payload;
   }
 
+  function classDiskBody() {
+    var body = {
+      classes: state.classes,
+      archive: archiveForSave()
+    };
+    if (examsSeen || (state.exams && state.exams.length)) body.exams = state.exams || [];
+    if (staffBookSeen || staffBookHasData()) body.staffBook = state.staffBook || {};
+    if (soaSeen || (state.soaSlots && state.soaSlots.length)) body.soaSlots = state.soaSlots || [];
+    return JSON.stringify(body);
+  }
+
   function classBookPayload() {
     var payload = {
       kind: 'ocean-edu-classes',
@@ -670,6 +766,7 @@
       classes: state.classes,
       archive: archiveForSave()
     };
+    if (classShareAt) payload.shareAt = classShareAt;
     if (examsSeen || (state.exams && state.exams.length)) payload.exams = state.exams || [];
     if (staffBookSeen || staffBookHasData()) payload.staffBook = state.staffBook || {};
     if (soaSeen || (state.soaSlots && state.soaSlots.length)) payload.soaSlots = state.soaSlots || [];
@@ -706,6 +803,8 @@
 
   function writeNamedFile(name, json) {
     if (!dirHandle || !dirHandle.getFileHandle) return Promise.resolve(false);
+    if (!json || String(json).charAt(0) !== '{') return Promise.resolve(false);
+    if ((name === CLASS_FILE || name === DATA_FILE) && String(json).indexOf('"classes"') < 0) return Promise.resolve(false);
     return dirHandle.getFileHandle(name, { create: true }).then(function (file) {
       return file.createWritable().then(function (stream) {
         return stream.write(json).then(function () { return stream.close(); }).then(function () { return true; });
@@ -789,16 +888,47 @@
   function writeFrozenFiles(dataJson, classFileJson) {
     return ensureFolderWrite().then(function (ok) {
       if (!ok) return false;
-      return Promise.all([
-        writeNamedFile(DATA_FILE, dataJson),
-        writeNamedFile(CLASS_FILE, classFileJson)
-      ]).then(function (flags) { return !!(flags[0] && flags[1]); });
+      var jobs = [writeNamedFile(DATA_FILE, dataJson)];
+      if (classFileJson != null) jobs.push(writeNamedFile(CLASS_FILE, classFileJson));
+      return Promise.all(jobs).then(function (flags) {
+        return flags.every(function (flag) { return !!flag; });
+      });
+    });
+  }
+
+  function classSignature(cls) {
+    var copy = {};
+    Object.keys(cls || {}).forEach(function (key) {
+      if (key !== 'updatedAt') copy[key] = cls[key];
+    });
+    return JSON.stringify(copy);
+  }
+
+  function stampClassUpdates() {
+    if (lastClassJson === null) return;
+    var previous = [];
+    try { previous = JSON.parse(lastClassJson) || []; } catch (err) { return; }
+    if (!Array.isArray(previous)) return;
+    var prevById = {};
+    previous.forEach(function (cls) {
+      if (cls && cls.id) prevById[cls.id] = classSignature(cls);
+    });
+    var nowIso = new Date().toISOString();
+    (state.classes || []).forEach(function (cls) {
+      if (!cls || !cls.id) return;
+      var before = prevById[cls.id];
+      if (!before) {
+        if (!cls.updatedAt) cls.updatedAt = nowIso;
+        return;
+      }
+      if (classSignature(cls) !== before) cls.updatedAt = nowIso;
     });
   }
 
   function save(options) {
     if (savePaused) return true;
     if (!(options && (options.quiet || options.keepStamp))) archivePurgePersist = true;
+    stampClassUpdates();
     var classJson = JSON.stringify(state.classes);
     if (lastClassJson !== null && classJson !== lastClassJson) state.settings.classesSavedAt = new Date().toISOString();
     lastClassJson = classJson;
@@ -806,15 +936,20 @@
       state.settings.savedAt = new Date().toISOString();
       state.settings.rev = (Number(state.settings.rev) || 0) + 1;
     }
+    var diskBody = classDiskBody();
+    var classFileDirty = lastClassDiskBody === null || diskBody !== lastClassDiskBody;
+    if (classFileDirty) classShareAt = state.settings.savedAt || new Date().toISOString();
+    lastClassDiskBody = diskBody;
     var dataJson = JSON.stringify(dataPayload());
-    var classFileJson = JSON.stringify(classBookPayload());
+    var classFileJson = classFileDirty ? JSON.stringify(classBookPayload()) : null;
     var snapshot = JSON.parse(dataJson);
     localRaw = snapshot;
+    var stored = true;
     try {
       localStorage.setItem(STORAGE, dataJson);
     } catch (err) {
-      toast('Không đủ chỗ lưu trên máy. Hãy bớt ảnh thông báo.');
-      return false;
+      stored = false;
+      toast('Không đủ chỗ lưu trên trình duyệt. Vẫn thử ghi file JSON trong thư mục Index local.');
     }
     openLocalDb().then(function (db) {
       var tx = db.transaction('kv', 'readwrite');
@@ -823,17 +958,21 @@
     var quiet = options && options.quiet;
     var serial = ++folderSerial;
     if (!quiet) showSync('saving');
-    folderWrite = folderWrite.then(function () {
+    folderWrite = folderWrite.catch(function () { return false; }).then(function () {
       if (serial !== folderSerial) return false;
       return writeFrozenFiles(dataJson, classFileJson);
     }).then(function (ok) {
       if (serial !== folderSerial || quiet) return;
       if (ok) { showSync('confirmed'); return; }
       showSync('idle');
+      if (!stored) return;
       if (!syncWarned) {
         syncWarned = true;
         toast('Đã lưu trên trình duyệt. Chưa ghi được file JSON trong thư mục. Hãy chọn thư mục Index local một lần để lần sau ghi thẳng và hiện confirmed.');
       }
+    }).catch(function () {
+      if (serial !== folderSerial || quiet) return;
+      showSync('idle');
     });
     return true;
   }
@@ -909,8 +1048,11 @@
 
   function applySkin(skin) {
     if (!ui.user) { toast('Đăng nhập để giữ giao diện cho tài khoản này.'); return; }
-    rememberLook({ skin: SKIN_IDS.indexOf(skin) >= 0 ? skin : 'default' });
+    var next = SKIN_IDS.indexOf(skin) >= 0 ? skin : 'default';
+    ui.skinPeek = next;
+    rememberLook({ skin: next });
     paintAppearance();
+    pinBars();
     save();
   }
 
@@ -1006,9 +1148,15 @@
     }, item.ms);
   }
 
+  function skinAlias(skin) {
+    if (skin === 'minimal') return 'goth';
+    return skin || '';
+  }
+
   function normalizeAppearance(raw) {
     var look = raw && typeof raw === 'object' ? raw : {};
-    var skin = SKIN_IDS.indexOf(look.skin) >= 0 ? look.skin : 'default';
+    var named = skinAlias(look.skin);
+    var skin = SKIN_IDS.indexOf(named) >= 0 ? named : 'default';
     var theme = look.theme === 'night' ? 'night' : 'day';
     var primary = PRIMARY_IDS.indexOf(look.primary) >= 0 ? look.primary : '';
     return { skin: skin, theme: theme, primary: primary };
@@ -1301,7 +1449,8 @@
 
   function skinOf(acc) {
     var look = acc && acc.appearance;
-    if (look && SKIN_IDS.indexOf(look.skin) >= 0) return look.skin;
+    var named = skinAlias(look && look.skin);
+    if (SKIN_IDS.indexOf(named) >= 0) return named;
     return 'default';
   }
 
@@ -1309,21 +1458,80 @@
     var acc = currentAccount();
     var root = document.documentElement;
     var skin = skinOf(acc);
+    var prevSkin = root.getAttribute('data-skin');
     root.setAttribute('data-skin', skin);
-    var theme = state.settings.theme === 'night' ? 'night' : 'day';
-    var primary = PRIMARY_IDS.indexOf(state.settings.primary) >= 0 ? state.settings.primary : 'ocean';
-    if (acc && acc.appearance && skin === 'default') {
-      if (acc.appearance.theme) theme = acc.appearance.theme === 'night' ? 'night' : 'day';
-      if (PRIMARY_IDS.indexOf(acc.appearance.primary) >= 0) primary = acc.appearance.primary;
+    if (prevSkin && prevSkin !== skin) {
+      var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (!reduceMotion) {
+        root.classList.remove('is-skin-swap');
+        void root.offsetWidth;
+        root.classList.add('is-skin-swap');
+        clearTimeout(skinSwapTimer);
+        skinSwapTimer = setTimeout(function () { root.classList.remove('is-skin-swap'); }, 360);
+      }
     }
-    root.setAttribute('data-theme', theme);
-    root.setAttribute('data-primary', primary);
-    var look = document.getElementById('default-look');
-    if (look) look.hidden = skin !== 'default';
+    root.setAttribute('data-theme', 'day');
+    root.setAttribute('data-primary', 'ocean');
     document.querySelectorAll('[data-skin-btn]').forEach(function (btn) {
       var on = btn.getAttribute('data-skin') === skin;
       btn.classList.toggle('is-on', on);
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
+    paintSkinDesk();
+  }
+
+  function skinRecord(id) {
+    var found = null;
+    SKIN_BOOK.forEach(function (group) {
+      group.items.forEach(function (item) {
+        if (item.id === id) found = { group: group, item: item };
+      });
+    });
+    return found;
+  }
+
+  function paintSkinDesk() {
+    var root = document.getElementById('skin-groups');
+    if (!root) return;
+    var current = skinOf(currentAccount());
+    var peek = ui.skinPeek || current;
+    root.innerHTML = SKIN_BOOK.map(function (group) {
+      var open = ui.skinFold === group.id;
+      var look = group.items[0];
+      group.items.forEach(function (item) {
+        if (item.id === current) look = item;
+      });
+      group.items.forEach(function (item) {
+        if (item.id === peek) look = item;
+      });
+      var buttons = group.items.map(function (item) {
+        var on = item.id === current;
+        return '<button type="button" class="skin-pick' + (on ? ' is-on' : '') + '" data-act="set-skin" data-skin="' + item.id + '" data-skin-btn aria-pressed="' + (on ? 'true' : 'false') + '">' + esc(item.name) + '</button>';
+      }).join('');
+      return '<section class="skin-fold' + (open ? ' is-open' : '') + '">' +
+        '<button type="button" class="skin-fold-btn" data-act="skin-fold" data-group="' + group.id + '" aria-expanded="' + (open ? 'true' : 'false') + '">' + esc(group.title) + '</button>' +
+        (open
+          ? '<div class="skin-fold-body"><p class="help">' + esc(group.lead) + '</p>' +
+            '<div class="skin-stage" data-look="' + look.id + '">' +
+            '<div class="skin-stage-bar"><span>Ocean EDU</span><b></b></div>' +
+            '<div class="skin-stage-card"><strong>Khung cố định</strong><em>Menu chính</em></div>' +
+            '<span class="skin-stage-pill">Mở</span></div>' +
+            '<p class="skin-stage-copy">' + esc(look.text) + '</p>' +
+            '<div class="skin-grid">' + buttons + '</div></div>'
+          : '') +
+        '</section>';
+    }).join('');
+  }
+
+  function peekSkin(id) {
+    if (!id || SKIN_IDS.indexOf(id) < 0 || ui.skinPeek === id) return;
+    var rec = skinRecord(id);
+    if (!rec || rec.group.id !== ui.skinFold) return;
+    ui.skinPeek = id;
+    var stage = document.querySelector('#skin-groups .skin-fold.is-open .skin-stage');
+    var copy = document.querySelector('#skin-groups .skin-fold.is-open .skin-stage-copy');
+    if (stage) stage.setAttribute('data-look', id);
+    if (copy) copy.textContent = rec.item.text;
   }
 
   function wait(ms) {
@@ -1430,6 +1638,23 @@
   function clockButton() {
     return '<button type="button" class="clock-btn" data-act="open-clock" aria-label="Mở hộp thoại ngày giờ">' +
       '<span data-live="date">—</span><strong data-live="time">—</strong></button>';
+  }
+
+  function houseSvg() {
+    return '<svg class="home-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" shape-rendering="crispEdges">' +
+      '<path fill="currentColor" d="M2 7L8 2l6 5v7H10v-4H6v4H2z"/>' +
+      '</svg>';
+  }
+
+  function homeButton() {
+    return '<button type="button" class="btn home-btn" data-act="nav" data-screen="menu" aria-label="home">' +
+      houseSvg() + '<span>home</span></button>';
+  }
+
+  function penSvg() {
+    return '<svg class="pen-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">' +
+      '<path fill="currentColor" d="M2 12.5l.6 1.5h2.2l.4-1.5zM11.2 1.4l3.4 3.4-8 8-2.6.4.4-2.6z"/>' +
+      '</svg>';
   }
 
   function toolButtons() {
@@ -1558,7 +1783,7 @@
   function viewMenu() {
     var stats = currentWeekStats(null);
     return shell(summaryHtml(stats) + dashboardHtml() +
-      '<details class="menu-fold"><summary>Menu chính A–H</summary><section class="menu-grid">' +
+      '<details class="menu-fold"><summary>Menu chính A–I</summary><section class="menu-grid">' +
       '<button type="button" class="menu-card" data-act="nav" data-screen="classes">' + iconClass() +
       '<div class="kicker">A · CLASS INFOS</div><h2>Quản lý lớp</h2>' +
       '<p>Lớp, học viên, sĩ số. Nút xem chuyên cần nằm trên từng thẻ.</p></button>' +
@@ -1575,6 +1800,7 @@
       '<div class="kicker">E · STUDENT ARCHIVE</div><h2>Thư viện học viên</h2>' +
       '<p>Official đang học. Học viên cũ/kết thúc đã dừng hoặc hết hạn.</p></button>' +
       '<button type="button" class="menu-card" data-act="nav" data-screen="curriculum">' + iconBook() +
+      (L.curriculumFresh(state.classes, new Date()) ? '<span class="comic-fresh">đăng kí mới</span>' : '') +
       '<div class="kicker">F · CURRICULUM</div><h2>Xác nhận giáo trình</h2>' +
       '<p>Giáo trình, mua sách và tài khoản PEC.</p></button>' +
       '<button type="button" class="menu-card" data-act="nav" data-screen="exam">' + iconExam() +
@@ -1582,7 +1808,21 @@
       '<p>Chọn ngày trên lịch tháng, xem lịch thi theo tuần.</p></button>' +
       '<button type="button" class="menu-card" data-act="nav" data-screen="staff">' + iconStaff() +
       '<div class="kicker">H · TEACHER HOURS</div><h2>Công giáo viên</h2>' +
-      '<p>Giờ Teaching và giờ SOA của từng FET.</p></button></section></details>');
+      '<p>Giờ Teaching và giờ SOA của từng FET.</p></button>' +
+      '<button type="button" class="menu-card" data-act="nav" data-screen="dictionary">' + iconDict() +
+      '<span class="comic-meta">Bản meta thử nghiệm</span>' +
+      '<div class="kicker">I · DICTIONARY</div><h2>Dictionary</h2>' +
+      '<p>Tra từ Anh–Việt, ví dụ, từ đồng nghĩa và nghe phát âm.</p></button></section></details>');
+  }
+
+  function iconDict() {
+    return '<svg class="pixel-icon" viewBox="0 0 16 16" aria-hidden="true" shape-rendering="crispEdges">' +
+      '<rect fill="#0c4a72" x="1" y="2" width="14" height="12"/>' +
+      '<rect fill="#fff6d8" x="3" y="3" width="10" height="10"/>' +
+      '<rect fill="#e11d2e" x="4" y="5" width="5" height="2"/>' +
+      '<rect fill="#0c4a72" x="4" y="8" width="8" height="1"/>' +
+      '<rect fill="#0c4a72" x="4" y="10" width="6" height="1"/>' +
+      '</svg>';
   }
 
   function iconBook() {
@@ -1707,10 +1947,75 @@
     });
   }
 
+  function buildExamEntry(cls, dates, previous, ageFrom, ageTo, type) {
+    var slot = slotForExamDates(cls, dates);
+    var students = previous && Array.isArray(previous.students)
+      ? previous.students
+      : L.examCandidates(cls, {
+        ageFrom: type === 'pick' ? ageFrom : '',
+        ageTo: type === 'pick' ? ageTo : '',
+        now: new Date()
+      });
+    return {
+      classId: cls.id,
+      className: L.currentName(cls),
+      slotDow: slot.start ? Number(slot.dow) : '',
+      slotStart: slot.start || '',
+      slotEnd: slot.end || '',
+      examDate: dates[0],
+      examDates: dates.slice(),
+      students: students
+    };
+  }
+
+  function openExamEditor(exam) {
+    var classIds = {};
+    var dates = {};
+    var first = '';
+    (exam.entries || []).forEach(function (entry) {
+      if (!entry || !entry.classId) return;
+      classIds[entry.classId] = true;
+      dates[entry.classId] = {};
+      examDateList(entry).forEach(function (iso) {
+        dates[entry.classId][iso] = true;
+        if (!first || iso < first) first = iso;
+      });
+    });
+    ui.examWizard = {
+      step: 0,
+      editId: exam.id,
+      name: exam.name || '',
+      type: exam.type === 'pick' ? 'pick' : 'class',
+      ageFrom: exam.ageFrom || '',
+      ageTo: exam.ageTo || '',
+      classIds: classIds,
+      dates: dates,
+      calMonth: first ? first.slice(0, 7) : L.monthKey(new Date())
+    };
+    ui.examId = null;
+    ui.examWeek = '';
+    ui.formError = '';
+    render();
+  }
+
   function commitExam() {
     var w = ui.examWizard;
     if (!w) return;
     var ids = Object.keys(w.classIds);
+    var previousByClass = {};
+    var editing = null;
+    if (w.editId) {
+      editing = findExam(w.editId);
+      if (!editing) {
+        ui.formError = 'Không thấy đợt thi để sửa.';
+        render();
+        return;
+      }
+      (editing.entries || []).forEach(function (entry) {
+        if (entry && entry.classId) previousByClass[entry.classId] = entry;
+      });
+    }
+    var type = w.type === 'pick' ? 'pick' : 'class';
     var entries = [];
     for (var i = 0; i < ids.length; i++) {
       var cls = findClass(ids[i]);
@@ -1725,41 +2030,36 @@
         render();
         return;
       }
-      var slot = slotForExamDates(cls, dates);
-      entries.push({
-        classId: cls.id,
-        className: L.currentName(cls),
-        slotDow: slot.start ? Number(slot.dow) : '',
-        slotStart: slot.start || '',
-        slotEnd: slot.end || '',
-        examDate: dates[0],
-        examDates: dates,
-        students: L.examCandidates(cls, {
-          ageFrom: w.type === 'pick' ? w.ageFrom : '',
-          ageTo: w.type === 'pick' ? w.ageTo : '',
-          now: new Date()
-        })
-      });
+      entries.push(buildExamEntry(cls, dates, previousByClass[ids[i]], w.ageFrom, w.ageTo, type));
     }
     if (!state.exams) state.exams = [];
-    var examId = L.uid();
-    state.exams.push({
-      id: examId,
-      name: String(w.name || '').trim(),
-      type: w.type === 'pick' ? 'pick' : 'class',
-      ageFrom: w.type === 'pick' ? String(w.ageFrom || '') : '',
-      ageTo: w.type === 'pick' ? String(w.ageTo || '') : '',
-      createdAt: new Date().toISOString(),
-      entries: entries
-    });
+    var examId = editing ? editing.id : L.uid();
+    var name = String(w.name || '').trim();
+    if (editing) {
+      editing.name = name;
+      editing.type = type;
+      editing.ageFrom = type === 'pick' ? String(w.ageFrom || '') : '';
+      editing.ageTo = type === 'pick' ? String(w.ageTo || '') : '';
+      editing.entries = entries;
+    } else {
+      state.exams.push({
+        id: examId,
+        name: name,
+        type: type,
+        ageFrom: type === 'pick' ? String(w.ageFrom || '') : '',
+        ageTo: type === 'pick' ? String(w.ageTo || '') : '',
+        createdAt: new Date().toISOString(),
+        entries: entries
+      });
+    }
     examsSeen = true;
-    logAction('tạo lịch, tổ chức buổi thi ' + String(w.name || '').trim());
+    logAction((editing ? 'sửa lớp và lịch thi ' : 'tạo lịch, tổ chức buổi thi ') + name);
     ui.examWizard = null;
     ui.examId = examId;
     ui.examWeek = '';
     ui.formError = '';
     save();
-    toast('Đã tạo đợt thi.');
+    toast(editing ? 'Đã lưu lớp và lịch thi.' : 'Đã tạo đợt thi.');
     render();
   }
 
@@ -1773,7 +2073,7 @@
         '<span>' + (exam.type === 'pick' ? 'Chọn lọc' : 'Theo lớp') + '</span>' +
         '<span>' + (exam.entries || []).length + ' lớp · ' + n + ' học viên</span></button>';
     }).join('') : '<p class="muted">Chưa có đợt thi.</p>';
-    return shell('<div class="section-head"><div><button type="button" class="btn" data-act="nav" data-screen="menu">← Menu</button>' +
+    return shell('<div class="section-head"><div><span class="nav-pair"><button type="button" class="btn" data-act="nav" data-screen="menu">← Menu</button>' + homeButton() + '</span>' +
       '<h2>Kỳ thi</h2><p class="meta">Mục G</p></div><div class="btn-row">' +
       (canEdit() ? '<button type="button" class="btn btn-primary" data-act="exam-create">+ Tạo đợt thi</button>' : '') +
       '</div></div>' +
@@ -1790,7 +2090,9 @@
         '<label class="field"><span>Loại kỳ thi</span><select id="exam-type">' +
         '<option value="class"' + (w.type !== 'pick' ? ' selected' : '') + '>Theo lớp</option>' +
         '<option value="pick"' + (w.type === 'pick' ? ' selected' : '') + '>Chọn lọc</option></select></label>' +
-        '<p class="help">Xác nhận để sang bước chọn lớp. Thư mục chỉ được tạo sau bước chọn ngày thi.</p>';
+        '<p class="help">' + (w.editId
+          ? 'Sửa tên nếu cần, rồi chọn lại lớp và ngày thi. Lớp còn giữ thì giữ nguyên điểm và đánh giá. Lớp bỏ khỏi đợt thi sẽ mất thẻ điểm của lớp đó.'
+          : 'Xác nhận để sang bước chọn lớp. Thư mục chỉ được tạo sau bước chọn ngày thi.') + '</p>';
     } else if (step === 1) {
       var classes = (state.classes || []).slice().sort(function (a, b) {
         return L.currentName(a).localeCompare(L.currentName(b), 'vi');
@@ -1818,13 +2120,14 @@
         }).join('') + '</div>' +
         '<p class="help">Ngày nền xanh baby là buổi học theo lịch của lớp. Bấm để chọn ngày thi, khung đỏ. Bấm lại để hủy. Có thể chọn nhiều ngày, kể cả ngày không có lịch để bù. Mỗi lớp cần ít nhất một ngày.</p>';
     }
+    var editing = !!w.editId;
     var foot = '';
     if (step > 0) foot += '<button type="button" class="btn" data-act="exam-back">Quay lại</button>';
     foot += '<button type="button" class="btn" data-act="exam-cancel">Hủy</button>';
     if (step < 2) foot += '<button type="button" class="btn btn-primary" data-act="exam-next">' + (step === 0 ? 'Xác nhận' : 'Tiếp') + '</button>';
-    else foot += '<button type="button" class="btn btn-primary" data-act="exam-commit">Tạo thư mục đợt thi</button>';
-    return shell('<div class="section-head"><div><button type="button" class="btn" data-act="exam-cancel">← Kỳ thi</button>' +
-      '<h2>Tạo đợt thi</h2><p class="meta">' + (step === 0 ? 'Tên và loại' : ('Bước ' + step + ' / 2')) + '</p></div></div>' +
+    else foot += '<button type="button" class="btn btn-primary" data-act="exam-commit">' + (editing ? 'Lưu lớp và lịch thi' : 'Tạo thư mục đợt thi') + '</button>';
+    return shell('<div class="section-head"><div><span class="nav-pair"><button type="button" class="btn" data-act="exam-cancel">← Kỳ thi</button>' + homeButton() + '</span>' +
+      '<h2>' + (editing ? 'Sửa đợt thi' : 'Tạo đợt thi') + '</h2><p class="meta">' + (step === 0 ? 'Tên và loại' : ('Bước ' + step + ' / 2')) + '</p></div></div>' +
       '<section class="panel exam-panel">' + body + '<p class="form-error">' + esc(ui.formError) + '</p><div class="btn-row">' + foot + '</div></section>');
   }
 
@@ -1910,10 +2213,11 @@
         '<div class="table-wrap"><table class="exam-table"><thead><tr><th>Tên</th><th>Tên tiếng Anh</th><th>Mã học viên</th><th>Điểm thi</th><th>Đánh giá</th></tr></thead><tbody>' +
         examStudentRows(exam, entry) + '</tbody></table></div>' + extra + '</section>';
     }).join('');
-    return shell('<div class="section-head"><div><button type="button" class="btn" data-act="exam-list">← Kỳ thi</button>' +
+    return shell('<div class="section-head"><div><span class="nav-pair"><button type="button" class="btn" data-act="exam-list">← Kỳ thi</button>' + homeButton() + '</span>' +
       '<h2>' + esc(exam.name) + '</h2><p class="meta">' + (exam.type === 'pick' ? 'Chọn lọc' : 'Theo lớp') + '</p>' + age + '</div></div>' +
       '<p class="help">Lịch tuần tính từ tuần của ngày thi sớm nhất tới tuần của ngày thi muộn nhất.</p>' +
-      (canEdit() ? '' : '<p class="help">Tài khoản này chỉ xem điểm và đánh giá.</p>') + chips + cards);
+      (canEdit() ? '<div class="btn-row"><button type="button" class="btn" data-act="exam-edit">Sửa lớp và lịch thi</button></div>' : '<p class="help">Tài khoản này chỉ xem điểm và đánh giá.</p>') +
+      chips + cards);
   }
 
   function viewExam() {
@@ -2028,8 +2332,32 @@
     var key = L.levelKey(level);
     if (!key) return;
     var current = L.bookOf(stu, level);
+    var books = (current.books || []).map(function (item) {
+      return { status: item.status, statusAt: item.statusAt || '' };
+    });
+    while (books.length < 2) books.push({ status: 'not-bought', statusAt: '' });
+    var stamp = new Date().toISOString();
+    function put(index, status) {
+      if (index !== 0 && index !== 1) return;
+      var prev = books[index];
+      books[index] = {
+        status: status,
+        statusAt: status === prev.status ? (prev.statusAt || '') : stamp
+      };
+    }
+    if (patch && Array.isArray(patch.books)) {
+      patch.books.forEach(function (item, index) {
+        if (item && item.status != null) put(index, item.status);
+      });
+    } else if (patch && patch.bookIndex != null && patch.bookStatus != null) {
+      put(Number(patch.bookIndex), patch.bookStatus);
+    } else if (patch && patch.bookStatus != null) {
+      put(0, patch.bookStatus);
+    }
     var next = L.normalizeBook({
-      bookStatus: patch && patch.bookStatus != null ? patch.bookStatus : current.bookStatus,
+      books: books,
+      bookStatus: books[0].status,
+      bookStatusAt: books[0].statusAt,
       pecMode: patch && patch.pecMode != null ? patch.pecMode : current.pecMode,
       pecUser: patch && patch.pecUser != null ? patch.pecUser : current.pecUser,
       pecPass: patch && patch.pecPass != null ? patch.pecPass : current.pecPass
@@ -2061,23 +2389,61 @@
     ratio.textContent = ratioText(curriculumRatio(cls, curriculumLevelOf(cls)));
   }
 
+  function curriculumMonthKey() {
+    return ui.curriculumMonth || L.monthKey(new Date());
+  }
+
+  function priceBoardHtml() {
+    var rows = [
+      ['Little Learning Star', L.curriculumBooks('pre-kindy-a')[0].price],
+      ['Disney', L.curriculumBooks('kindy-1a')[0].price],
+      ['English Code starter', L.curriculumBooks('pre-kids-a')[0].price],
+      ['English Code', L.curriculumBooks('kids-1a')[0].price],
+      ['FOCUS Coursebook', L.curriculumBooks('teens-1a')[0].price],
+      ['FOCUS Workbook', L.curriculumBooks('teens-1a')[1].price],
+      ['Focus on IELTS', L.curriculumBooks('pre-ielts')[0].price],
+      ['Focus on IELTS Foundation Coursebook', L.curriculumBooks('ielts-40')[0].price],
+      ['IELTS Expert 4.5 – 8.0', L.curriculumBooks('ielts-45')[0].price]
+    ];
+    return '<section class="price-board"><h3>Bảng giá giáo trình</h3>' +
+      '<div class="table-wrap"><table class="book-stats-table"><thead><tr><th>Giáo trình</th><th>Đơn giá</th></tr></thead><tbody>' +
+      rows.map(function (row) {
+        return '<tr><td>' + esc(row[0]) + '</td><td>' + esc(L.formatVnd(row[1])) + '</td></tr>';
+      }).join('') + '</tbody></table></div>' +
+      '<p class="help">FOCUS TEENS có hai quyển: Coursebook và Workbook. IELTS 4.0 dùng Focus on IELTS Foundation Coursebook. IELTS 4.5 đến 8.0 dùng IELTS Expert theo cấp độ.</p></section>';
+  }
+
+  function curriculumStatsHtml() {
+    var key = curriculumMonthKey();
+    var stats = L.curriculumMonthStats(state.classes, key);
+    var body = '<table class="book-stats-table" id="book-sales"><thead><tr><th>Chỉ số</th><th>Số</th></tr></thead><tbody>' +
+      '<tr><td>Số sách đã đóng phát trong tháng</td><td data-sale="paid-count">' + stats.soldBooks + '</td></tr>' +
+      '<tr><td>Số sách còn nợ</td><td data-sale="debt-count">' + stats.debtBooks + '</td></tr>' +
+      '<tr><td>Tổng doanh số đã đóng phát trong tháng</td><td data-sale="paid-money">' + esc(L.formatVnd(stats.revenue)) + '</td></tr>' +
+      '<tr><td>Doanh số sách còn nợ chưa thanh toán</td><td data-sale="debt-money">' + esc(L.formatVnd(stats.debtRevenue)) + '</td></tr>' +
+      '</tbody></table>';
+    var cm = '';
+    if (ui.curriculumCmOpen) {
+      var cmRows = stats.cms.map(function (row) {
+        return '<tr><td>' + esc(row.cm) + '</td><td>' + row.soldBooks + '</td><td>' + esc(L.formatVnd(row.revenue)) + '</td><td>' + row.debtBooks + '</td><td>' + esc(L.formatVnd(row.debtRevenue)) + '</td></tr>';
+      }).join('');
+      cm = '<div class="table-wrap"><table class="book-stats-table" id="book-sales-cm"><thead><tr><th>CM</th><th>Sách đã đóng phát</th><th>Doanh số đã đóng</th><th>Sách còn nợ</th><th>Doanh số còn nợ</th></tr></thead><tbody>' +
+        (cmRows || '<tr><td colspan="5">Chưa có CM.</td></tr>') + '</tbody></table></div>';
+    }
+    return '<section class="book-stats"><h3>Doanh số bán sách chung</h3>' +
+      '<label class="field dash-month"><span>Tháng</span><input id="curriculum-month" type="month" value="' + esc(key) + '"></label>' +
+      '<p class="help">Số sách đã đóng phát và doanh số đã đóng chỉ tính sách chuyển sang Đã phát và đóng trong tháng đang xem. Sách chưa ghi ngày không cộng vào tháng đó. Số sách còn nợ và doanh số còn nợ là sách đang ở Đã phát-Chưa thanh toán, kể cả sách chưa ghi ngày.</p>' +
+      '<div class="book-stats-hit" data-act="curriculum-cm" role="button" tabindex="0">' + body + '</div>' +
+      '<div class="btn-row"><button type="button" class="btn' + (ui.curriculumCmOpen ? ' btn-primary' : '') + '" data-act="curriculum-cm">' +
+      (ui.curriculumCmOpen ? 'Ẩn chi tiết theo CM' : 'Xem chi tiết theo CM') + '</button></div>' +
+      cm + '</section>';
+  }
+
   function viewCurriculumList() {
-    var rows = state.classes.slice().sort(function (a, b) {
-      return L.currentName(a).localeCompare(L.currentName(b), 'vi');
-    }).map(function (cls) {
-      var level = L.currentLevel(cls);
-      var grade = L.gradeById(level && (level.gradeId || cls.gradeId));
-      var ratio = curriculumRatio(cls, level);
-      return '<tr><td><button type="button" class="stu-name" data-act="open-curriculum" data-id="' + esc(cls.id) + '">' + esc(L.currentName(cls)) + '</button></td>' +
-        '<td>' + esc(gradeText(grade, cls)) + '</td>' +
-        '<td>' + esc(L.curriculumName(grade)) + '</td>' +
-        '<td>' + esc(ratioText(ratio)) + '</td></tr>';
-    }).join('');
-    return shell('<div class="section-head"><div><button type="button" class="btn" data-act="nav" data-screen="menu">← Menu</button>' +
+    return shell('<div class="section-head"><div><span class="nav-pair"><button type="button" class="btn" data-act="nav" data-screen="menu">← Menu</button>' + homeButton() + '</span>' +
       '<h2>Xác nhận giáo trình</h2><p class="meta">Mục F</p></div></div>' +
-      '<p class="help">Mỗi lớp hiện tên, cấp độ đang học, giáo trình của cấp đó, số học viên đã mua sách và số học viên đã có PEC. Bấm tên lớp để xem từng học viên. Khi lớp lên cấp, giáo trình trên danh sách đổi theo cấp mới.</p>' +
-      '<div class="table-wrap"><table class="curriculum-table"><thead><tr><th>Tên lớp</th><th>Cấp độ</th><th>Giáo trình</th><th>Mua sách / PEC</th></tr></thead><tbody>' +
-      (rows || '<tr><td colspan="4">Chưa có lớp.</td></tr>') + '</tbody></table></div>');
+      '<p class="help">Danh sách lớp giống Mục A: dạng thẻ theo nhóm KINDY, KIDS, TEENS, IELTS và custom, hoặc dạng list theo trình độ hay số lớp. Khung giữ màu của từng loại lớp. Bấm thư mục để mở giáo trình của lớp.</p>' +
+      priceBoardHtml() + curriculumStatsHtml() + classBrowser('curriculum') + modalHtml());
   }
 
   function curriculumPecCells(stu, rec, edit) {
@@ -2114,24 +2480,87 @@
       else active.push(stu);
     });
     var ordered = L.sortStudents(active, 'name').concat(L.sortStudents(paused, 'name'));
+    var catalog = L.curriculumBooks(grade);
+    var bookA = catalog[0] || null;
+    var bookB = catalog[1] || null;
+    var cols = (edit ? 1 : 0) + 9;
     var rows = ordered.map(function (stu, index) {
       var rec = L.bookOf(stu, level);
-      var bookCell = edit
-        ? '<select class="book-pick ' + bookStatusClass(rec.bookStatus) + '" data-book data-id="' + esc(stu.id) + '">' + bookStatusOptions(rec.bookStatus) + '</select>'
-        : bookStatusView(rec.bookStatus);
-      return '<tr' + (isPausedStudent(stu) ? ' class="row-gray"' : '') + '><td>' + (index + 1) + '</td><td>' + esc(showText(stu.name)) + '</td><td>' + esc(showText(stu.englishName)) + '</td><td>' + esc(showText(stu.code)) + '</td><td>' + bookCell + '</td>' + curriculumPecCells(stu, rec, edit) + '</tr>';
+      var tick = edit
+        ? '<td><input type="checkbox" data-book-pick="' + esc(stu.id) + '"' + (ui.bookPick[stu.id] ? ' checked' : '') + ' aria-label="Chọn ' + esc(stu.name || '') + '"></td>'
+        : '';
+      return '<tr' + (isPausedStudent(stu) ? ' class="row-gray"' : '') + '>' + tick +
+        '<td>' + (index + 1) + '</td><td>' + esc(showText(stu.name)) + '</td><td>' + esc(showText(stu.englishName)) + '</td><td>' + esc(showText(stu.code)) + '</td>' +
+        bookSlotCell(stu, bookA, 0, rec, edit) + bookSlotCell(stu, bookB, 1, rec, edit) +
+        '<td class="book-prices">' + bookPriceHtml(catalog, rec) + '</td>' +
+        curriculumPecCells(stu, rec, edit) + '</tr>';
     }).join('');
+    var priceLine = catalog.length
+      ? catalog.map(function (book) { return book.name + ' ' + L.formatVnd(book.price); }).join(' · ')
+      : 'Chưa có giá';
     var pastNote = level && level.to
-      ? '<p class="help">Đang xem cấp độ cũ. Giáo trình của cấp này là ' + esc(L.curriculumName(grade)) + '. Admin sửa dữ liệu sách và PEC của giai đoạn này mà không đổi cấp đang học.</p>'
-      : '<p class="help">Giáo trình hiện tại là ' + esc(L.curriculumName(grade)) + '. Chọn cấp độ cũ trong danh sách để xem lại giáo trình và dữ liệu sách, PEC của giai đoạn đó.</p>';
-    return shell('<div class="section-head"><div><button type="button" class="btn" data-act="curriculum-back">← Danh sách giáo trình</button>' +
+      ? '<p class="help">Đang xem cấp độ cũ. Giáo trình của cấp này là ' + esc(L.curriculumName(grade)) + '. Giá: ' + esc(priceLine) + '. Admin sửa dữ liệu sách và PEC của giai đoạn này mà không đổi cấp đang học.</p>'
+      : '<p class="help">Giáo trình hiện tại là ' + esc(L.curriculumName(grade)) + '. Giá: ' + esc(priceLine) + '. Chọn cấp độ cũ trong danh sách để xem lại giáo trình và dữ liệu sách, PEC của giai đoạn đó.</p>';
+    var send = edit
+      ? '<div class="btn-row"><button type="button" class="btn btn-primary" data-act="book-message">Gửi tin nhắn</button></div>' +
+        '<p class="help">Tick một hoặc nhiều học viên, rồi bấm Gửi tin nhắn để lấy nội dung đăng ký sách. Bút copy giữ xuống dòng khi dán.</p>'
+      : '<p class="help">Tài khoản này chỉ xem. Admin mới sửa trạng thái mua sách và PEC.</p>';
+    return shell('<div class="section-head"><div><span class="nav-pair"><button type="button" class="btn" data-act="curriculum-back">← Danh sách giáo trình</button>' + homeButton() + '</span>' +
       '<h2>' + esc(L.currentName(cls)) + '</h2><p class="meta">' + esc(gradeText(grade, cls)) + ' · ' + esc(L.curriculumName(grade)) + '</p>' +
       '<p class="meta" id="curriculum-ratio">' + esc(ratioText(curriculumRatio(cls, level))) + '</p></div></div>' +
       '<label class="field filter-field"><span>Cấp độ và giáo trình</span><select id="curriculum-level">' + options + '</select></label>' +
-      pastNote +
-      (edit ? '' : '<p class="help">Tài khoản này chỉ xem. Admin mới sửa trạng thái mua sách và PEC.</p>') +
-      '<div class="table-wrap"><table class="curriculum-table"><thead><tr><th>STT</th><th>Học viên</th><th>Tên tiếng Anh</th><th>Mã học viên</th><th>Mua sách</th><th>Tài khoản PEC</th><th>Mật khẩu PEC</th></tr></thead><tbody>' +
-      (rows || '<tr><td colspan="7">Lớp chưa có học viên.</td></tr>') + '</tbody></table></div>');
+      pastNote + send +
+      '<div class="table-wrap"><table class="curriculum-table"><thead><tr>' +
+      (edit ? '<th></th>' : '') +
+      '<th>STT</th><th>Học viên</th><th>Tên tiếng Anh</th><th>Mã học viên</th><th>Giáo trình</th><th>Giáo trình</th><th>Giá</th><th>Tài khoản PEC</th><th>Mật khẩu PEC</th></tr></thead><tbody>' +
+      (rows || '<tr><td colspan="' + cols + '">Lớp chưa có học viên.</td></tr>') + '</tbody></table></div>' + modalHtml());
+  }
+
+  function bookSlotCell(stu, book, slot, rec, edit) {
+    if (!book) return '<td class="book-slot book-slot-empty"></td>';
+    var item = rec.books && rec.books[slot] ? rec.books[slot] : { status: 'not-bought' };
+    var open = ui.bookFold === stu.id + ':' + slot;
+    var arrow = edit
+      ? '<button type="button" class="book-arrow" data-act="book-fold" data-id="' + esc(stu.id) + '" data-slot="' + slot + '" aria-expanded="' + (open ? 'true' : 'false') + '" aria-label="Trạng thái thanh toán"><span class="chev"></span></button>'
+      : '';
+    var menu = open && edit
+      ? '<div class="book-menu">' + L.BOOK_STATUS.map(function (choice) {
+        return '<button type="button" class="btn book-choice ' + bookStatusClass(choice.id) + (choice.id === item.status ? ' is-on' : '') + '" data-act="book-set" data-id="' + esc(stu.id) + '" data-slot="' + slot + '" data-status="' + choice.id + '">' + esc(choice.label) + '</button>';
+      }).join('') + '</div>'
+      : '';
+    return '<td class="book-slot ' + bookStatusClass(item.status) + '"><div class="book-slot-head"><span>' + esc(book.name) + '</span>' + arrow + '</div>' + menu + '</td>';
+  }
+
+  function bookPriceHtml(catalog, rec) {
+    if (!catalog.length) return '<span class="book-price">—</span>';
+    return catalog.map(function (book, index) {
+      var item = rec.books && rec.books[index] ? rec.books[index] : { status: 'not-bought' };
+      var tone = item.status === 'issued-paid' ? ' is-paid' : (item.status === 'issued-unpaid' ? ' is-unpaid' : '');
+      return '<span class="book-price' + tone + '">' + esc(L.formatVnd(book.price)) + '</span>';
+    }).join('');
+  }
+
+  function detailBookFields(bookRec, bookGrade, edit) {
+    var catalog = L.curriculumBooks(bookGrade);
+    if (!catalog.length) {
+      return edit
+        ? '<p class="help">Cấp độ này chưa có giáo trình.</p>'
+        : '<br><b>Giáo trình:</b> ?';
+    }
+    if (!edit) {
+      return catalog.map(function (book, index) {
+        var item = bookRec.books && bookRec.books[index] ? bookRec.books[index] : { status: 'not-bought' };
+        var tone = item.status === 'issued-paid' ? ' is-paid' : (item.status === 'issued-unpaid' ? ' is-unpaid' : '');
+        return '<br><b>' + esc(book.name) + ':</b> ' + bookStatusView(item.status) +
+          ' <span class="book-price' + tone + '">' + esc(L.formatVnd(book.price)) + '</span>';
+      }).join('');
+    }
+    return '<p class="help">Giáo trình hiện tại: ' + esc(catalog.map(function (book) { return book.name; }).join(' · ')) + '. Cấp độ cũ sửa ở mục Xác nhận giáo trình.</p>' +
+      catalog.map(function (book, index) {
+        var item = bookRec.books && bookRec.books[index] ? bookRec.books[index] : { status: 'not-bought' };
+        var id = index === 0 ? 'd-book' : 'd-book-2';
+        return '<label class="field"><span>' + esc(book.name) + ' · ' + esc(L.formatVnd(book.price)) + '</span><select id="' + id + '" class="book-pick ' + bookStatusClass(item.status) + '">' + bookStatusOptions(item.status) + '</select></label>';
+      }).join('');
   }
 
   function viewCurriculum() {
@@ -2313,13 +2742,18 @@
     return (near.length ? near : list).slice(0, 24);
   }
 
+  function classUpdatedMark(cls) {
+    if (!L.classJustUpdated(cls, new Date())) return '';
+    return '<span class="comic-updated">(Updated)</span>';
+  }
+
   function folderCard(cls, now, mode) {
     var level = displayLevel(cls, now, mode);
     var grade = L.gradeById(level.gradeId || cls.gradeId);
     var progress = L.progressOf(cls, now);
     var count = listedCount(cls, now);
     var pct = progress.total ? Math.round(progress.done / progress.total * 100) : 0;
-    var act = mode === 'homework' ? 'open-homework' : 'open-class';
+    var act = mode === 'homework' ? 'open-homework' : (mode === 'curriculum' ? 'open-curriculum' : 'open-class');
     var name = mode === 'homework' ? ((level && level.name) || L.currentName(cls)) : L.currentName(cls);
     var held = mode === 'homework' && name !== L.currentName(cls) ? '<span>Tháng này giữ trình độ cũ</span>' : '';
     var extra = mode === 'homework'
@@ -2329,7 +2763,9 @@
     var crowd = count > 17
       ? '<span class="crowd">!<span class="crowd-tip">Lớp quá tải</span></span>'
       : '';
+    var updated = mode === 'homework' ? '' : classUpdatedMark(cls);
     var button = '<button type="button" class="folder group-' + esc(group.toLowerCase()) + '" data-act="' + act + '" data-id="' + esc(cls.id) + '">' +
+      updated +
       crowd +
       '<strong>' + esc(name) + '</strong>' +
       '<span>' + esc(kindLabel(cls)) + '</span>' +
@@ -2341,12 +2777,44 @@
       held + extra +
       '<span class="meter" aria-hidden="true"><span style="width:' + pct + '%"></span></span></button>';
     if (mode === 'homework') return button;
-    return '<div class="folder-item" data-name="' + esc(String(name).toLowerCase()) + '">' + button +
-      '<button type="button" class="btn folder-hw" data-act="open-homework" data-id="' + esc(cls.id) + '">Xem chuyên cần</button></div>';
+    var side = mode === 'curriculum' ? '' : '<button type="button" class="btn folder-hw" data-act="open-homework" data-id="' + esc(cls.id) + '">Xem chuyên cần</button>';
+    return '<div class="folder-item" data-name="' + esc(String(name).toLowerCase()) + '">' + button + side + '</div>';
   }
 
-  function viewClasses() {
+  function classLine(cls, mode) {
+    var level = L.currentLevel(cls);
+    var grade = L.gradeById((level && level.gradeId) || cls.gradeId);
+    var group = classGroupId(cls, level);
+    var name = L.currentName(cls);
+    var act = mode === 'curriculum' ? 'open-curriculum' : 'open-class';
+    var side = mode === 'curriculum' ? '' : '<button type="button" class="btn" data-act="open-homework" data-id="' + esc(cls.id) + '">Xem chuyên cần</button>';
+    return '<div class="class-line group-' + esc(String(group || '').toLowerCase()) + '" data-name="' + esc(name.toLowerCase()) + '">' +
+      '<button type="button" class="class-open" data-act="' + act + '" data-id="' + esc(cls.id) + '">' +
+      '<strong>' + esc(name) + classUpdatedMark(cls) + '</strong>' +
+      '<span>Trình độ: ' + esc(L.trackLabel(cls, grade)) + '</span>' +
+      '<span>Số lớp: ' + esc(cls.number || '—') + '</span>' +
+      '<span>Cấp độ: ' + esc(gradeText(grade, cls)) + '</span></button>' +
+      side + '</div>';
+  }
+
+  function classBrowser(mode) {
     var now = new Date();
+    var curriculum = mode === 'curriculum';
+    var layout = curriculum ? (ui.curriculumLayout === 'list' ? 'list' : 'cards') : (ui.classLayout === 'list' ? 'list' : 'cards');
+    var sort = curriculum ? (ui.curriculumSort === 'number' ? 'number' : 'level') : ui.classSort;
+    var query = String(curriculum ? ui.curriculumQuery : ui.classQuery || '').trim().toLowerCase();
+    var cardMode = curriculum ? 'curriculum' : undefined;
+    function matches(cls) {
+      if (!query) return true;
+      return L.currentName(cls).toLowerCase().indexOf(query) >= 0;
+    }
+    function bySort(a, b) {
+      var gradeGap = L.gradeIndex(a.gradeId) - L.gradeIndex(b.gradeId);
+      var numberGap = (Number(a.number) || 0) - (Number(b.number) || 0);
+      var nameGap = L.currentName(a).localeCompare(L.currentName(b), 'vi');
+      if (sort === 'number') return numberGap || gradeGap || nameGap;
+      return gradeGap || numberGap || nameGap;
+    }
     var blocks = L.GROUPS.map(function (group) {
       var list = state.classes.filter(function (cls) {
         return classGroupId(cls, L.currentLevel(cls)) === group.id;
@@ -2354,10 +2822,43 @@
         if (group.id === 'CUSTOM') return L.currentName(a).localeCompare(L.currentName(b), 'vi');
         return L.gradeIndex(a.gradeId) - L.gradeIndex(b.gradeId) || a.number - b.number;
       });
-      var cards = list.length ? list.map(function (cls) { return folderCard(cls, now); }).join('') : '<p class="muted">Chưa có lớp trong nhóm này.</p>';
-      return '<section class="group-block group-' + group.id.toLowerCase() + '"><h3>' + esc(group.label) + '</h3><div class="folder-grid">' + cards + '</div></section>';
+      var cards = list.filter(matches);
+      var cardHtml = cards.length ? cards.map(function (cls) { return folderCard(cls, now, cardMode); }).join('') : '<p class="muted">Chưa có lớp trong nhóm này.</p>';
+      return '<section class="group-block group-' + group.id.toLowerCase() + '"><h3>' + esc(group.label) + '</h3><div class="folder-grid">' + cardHtml + '</div></section>';
     }).join('');
-    return shell('<div class="section-head"><div><button type="button" class="btn" data-act="nav" data-screen="menu">← Menu</button>' +
+    var knownGroup = {};
+    L.GROUPS.forEach(function (group) { knownGroup[group.id] = true; });
+    var loose = state.classes.filter(function (cls) {
+      return !knownGroup[classGroupId(cls, L.currentLevel(cls))];
+    }).sort(function (a, b) {
+      return L.currentName(a).localeCompare(L.currentName(b), 'vi');
+    });
+    if (loose.length) {
+      var looseCards = loose.filter(matches);
+      blocks += '<section class="group-block group-custom"><h3>Lớp chưa vào nhóm</h3><div class="folder-grid">' +
+        (looseCards.length ? looseCards.map(function (cls) { return folderCard(cls, now, cardMode); }).join('') : '<p class="muted">Không có lớp khớp bộ lọc.</p>') +
+        '</div></section>';
+    }
+    var listRows = state.classes.filter(matches).slice().sort(bySort).map(function (cls) { return classLine(cls, cardMode); }).join('');
+    var listHtml = '<div class="class-list">' + (listRows || '<p class="muted">Không có lớp khớp bộ lọc.</p>') + '</div>';
+    var layoutAct = curriculum ? 'curriculum-layout' : 'class-layout';
+    var sortAct = curriculum ? 'curriculum-sort' : 'class-sort';
+    var queryId = curriculum ? 'curriculum-q' : 'class-q';
+    var queryVal = curriculum ? (ui.curriculumQuery || '') : (ui.classQuery || '');
+    var sortRow = layout === 'list'
+      ? '<div class="btn-row class-sort"><button type="button" class="btn' + (sort !== 'number' ? ' btn-primary' : '') + '" data-act="' + sortAct + '" data-sort="level">Theo trình độ</button>' +
+        '<button type="button" class="btn' + (sort === 'number' ? ' btn-primary' : '') + '" data-act="' + sortAct + '" data-sort="number">Theo số lớp</button></div>'
+      : '';
+    return '<div class="btn-row class-layout">' +
+      '<button type="button" class="btn' + (layout === 'cards' ? ' btn-primary' : '') + '" data-act="' + layoutAct + '" data-layout="cards">Dạng thẻ</button>' +
+      '<button type="button" class="btn' + (layout === 'list' ? ' btn-primary' : '') + '" data-act="' + layoutAct + '" data-layout="list">Dạng list</button></div>' +
+      sortRow +
+      '<label class="field class-q"><span>Tìm lớp</span><input id="' + queryId + '" placeholder="Tên lớp" autocomplete="off" value="' + esc(queryVal) + '"></label>' +
+      (layout === 'list' ? listHtml : blocks);
+  }
+
+  function viewClasses() {
+    return shell('<div class="section-head"><div><span class="nav-pair"><button type="button" class="btn" data-act="nav" data-screen="menu">← Menu</button>' + homeButton() + '</span>' +
       '<h2>Quản lý lớp</h2></div><div class="btn-row">' +
       (canExportClasses() ? '<button type="button" class="btn" data-act="export-classes" data-kind="xlsx">Excel</button>' +
         '<button type="button" class="btn" data-act="export-classes" data-kind="pdf">PDF</button>' +
@@ -2366,9 +2867,8 @@
       (canEdit() ? '<button type="button" class="btn btn-primary" data-act="open-add-class">+ Thêm lớp</button>' : '') +
       '</div></div>' +
       summaryHtml(currentWeekStats(null)) +
-      '<p class="help">Thư mục viền vàng là KINDY, viền xanh là KIDS, viền đỏ là TEENS, viền xanh lá là IELTS, viền tím là lớp custom. Lớp custom không lên trình độ. Lớp TEENS hết TEENS 2B lên thang IELTS: tên trình độ vẫn là TEENS, cấp độ theo IELTS, số lớp giữ nguyên, thư mục nằm ở nhóm IELTS. Thẻ có dấu ! là lớp quá tải, sĩ số trên 17. Sĩ số có số thứ tự tối đa 20. Bấm vào thư mục để mở lớp. Nút Xem chuyên cần mở bảng chuyên cần của lớp. Print (in) mở hộp thoại in của máy và in bảng danh sách lớp đang xem.</p>' +
-      '<label class="field class-q"><span>Tìm lớp</span><input id="class-q" placeholder="Tên lớp" autocomplete="off"></label>' +
-      blocks + modalHtml());
+      '<p class="help">Thư mục viền vàng là KINDY, viền xanh là KIDS, viền đỏ là TEENS, viền xanh lá là IELTS, viền tím là lớp custom. Dạng thẻ là mặc định. Dạng list xếp theo trình độ hoặc số lớp và giữ màu khung theo loại lớp. Mọi lớp trong file đều hiện ở đây. Lớp không thuộc năm nhóm trên nằm ở cuối. Lớp custom không lên trình độ. Lớp TEENS hết TEENS 2B lên thang IELTS: tên trình độ vẫn là TEENS, cấp độ theo IELTS, số lớp giữ nguyên, thư mục nằm ở nhóm IELTS. Thẻ có dấu ! là lớp quá tải, sĩ số trên 17. Sĩ số có số thứ tự tối đa 20. Nhãn (Updated) ở góc thẻ là lớp vừa có cập nhật, tự mất sau 2 ngày. Bấm vào thư mục để mở lớp. Nút Xem chuyên cần mở bảng chuyên cần của lớp. Print (in) mở hộp thoại in của máy và in bảng danh sách lớp đang xem.</p>' +
+      classBrowser('classes') + modalHtml());
   }
 
   function studentRows(rows, now, openId) {
@@ -2436,7 +2936,7 @@
       (edit ? '<button type="button" class="btn" data-act="open-import">Cập nhật Excel</button>' +
       '<button type="button" class="btn btn-primary" data-act="open-add-student">+ Thêm học viên</button>' : '') +
       printBtn + '</div>' : '';
-    return shell('<div class="class-head"><div><button type="button" class="btn" data-act="nav" data-screen="classes">← Danh sách lớp</button>' +
+    return shell('<div class="class-head"><div><span class="nav-pair"><button type="button" class="btn" data-act="nav" data-screen="classes">← Danh sách lớp</button>' + homeButton() + '</span>' +
       '<h2>' + esc(L.currentName(cls)) + '</h2>' +
       '<p class="meta">' + esc(gradeText(grade, cls)) + ' · Nhóm ' + esc(classGroupId(cls)) + ' · Trình độ ' + esc(L.trackLabel(cls, grade)) + ' · ' + esc(kindLabel(cls)) + (cls.completed ? ' · Đã hoàn thành' : '') + (cls.endOpen ? ' · Ngày kết thúc 99/99/9999' : '') + '</p></div>' +
       tools + '</div>' +
@@ -2477,15 +2977,13 @@
     var bookLevel = found.cls ? L.currentLevel(found.cls) : null;
     var bookRec = L.bookOf(stu, bookLevel);
     var bookGrade = bookLevel ? L.gradeById(bookLevel.gradeId) : null;
-    var bookName = L.curriculumName(bookGrade);
     if (ui.detailEdit) {
       var notes = (stu.notes || []).map(function (note) {
         return noteRow(note.id, note.month, note.text);
       }).join('');
       var selfOn = bookRec.pecMode === 'self';
       body = '<label class="field"><span>Số điện thoại</span><input id="d-phone" value="' + esc(stu.phone) + '"></label>' +
-        '<p class="help">Giáo trình hiện tại: ' + esc(bookName) + '. Cấp độ cũ sửa ở mục Xác nhận giáo trình.</p>' +
-        '<label class="field"><span>Mua sách</span><select id="d-book" class="book-pick ' + bookStatusClass(bookRec.bookStatus) + '">' + bookStatusOptions(bookRec.bookStatus) + '</select></label>' +
+        detailBookFields(bookRec, bookGrade, true) +
         '<label class="checkline"><input type="checkbox" id="d-pec-self"' + (selfOn ? ' checked' : '') + '> Hv tự tạo</label>' +
         '<p class="field-label">Tài khoản PEC</p>' +
         '<input id="d-pec-user" value="' + esc(bookRec.pecUser) + '" autocomplete="off" spellcheck="false"' + (selfOn ? ' hidden' : '') + '>' +
@@ -2515,8 +3013,7 @@
         '<br><b>Tuổi:</b> <span data-age-for="' + esc(stu.dob || '') + '">' + (stu.dob === '?' ? '?' : (age == null ? '—' : age)) + '</span>' +
         typeLine +
         '<br><b>First EC:</b> ' + esc(showText(stu.ec)) +
-        '<br><b>Giáo trình:</b> ' + esc(bookName) +
-        '<br><b>Mua sách:</b> ' + bookStatusView(bookRec.bookStatus) +
+        detailBookFields(bookRec, bookGrade, false) +
         (bookRec.pecMode === 'self' ? '<br><b>PEC:</b> Hv tự tạo' : '') +
         '<br><b>Tài khoản PEC:</b> ' + pecUserView +
         '<br><b>Mật khẩu PEC:</b> ' + pecPassView + '</p>' + expireLine + noteLine +
@@ -2629,7 +3126,7 @@
         '<button type="button" class="btn" data-act="export-schedule" data-kind="print">Print (in)</button></div>'
       : '';
     var soaBtn = canEdit() ? '<button type="button" class="btn" data-act="open-soa">Thêm giờ SOA</button>' : '';
-    return shell('<div class="section-head"><div><button type="button" class="btn" data-act="nav" data-screen="menu">← Menu</button><h2>Thời khóa biểu</h2>' +
+    return shell('<div class="section-head"><div><span class="nav-pair"><button type="button" class="btn" data-act="nav" data-screen="menu">← Menu</button>' + homeButton() + '</span><h2>Thời khóa biểu</h2>' +
       '<p class="help">Một bảng cho buổi sáng, chiều và tối. Mỗi khung giờ của lớp là một buổi trên bảng. Lớp có hai buổi trong tuần hiện ở cả hai buổi đó. Bộ lọc đổi luôn nội dung xuất file. Print (in) in đúng bảng tuần đang hiển thị. Admin bấm thẻ lớp để hủy/đổi buổi hoặc mở danh sách lớp. Dấu ! đỏ ở góc thẻ là buổi chuyển lịch hoặc hủy cuối khóa. Đưa chuột vào dấu ! hoặc chạm giữ để xem chi tiết. Admin thêm giờ SOA (Office) cho FET và chọn Interview, event hoặc Lớp EB. Thẻ SOA nền trắng, chữ đỏ, không tính buổi dạy. Ô giờ SOA ở Mục H vẫn do Admin nhập theo tháng.</p></div>' +
       '<div class="btn-row">' + soaBtn + '<button type="button" class="btn" data-act="week" data-dir="-1">‹ Tuần trước</button>' +
       '<strong>' + (ui.weekOffset === 0 ? 'Tuần này · ' : '') + esc(model.label) + '</strong>' +
@@ -2643,7 +3140,7 @@
   function groupBlocks(mode) {
     var now = new Date();
     var month = L.monthKey(now);
-    return L.GROUPS.map(function (group) {
+    var html = L.GROUPS.map(function (group) {
       var list = state.classes.filter(function (cls) {
         var level = mode === 'homework' ? L.homeworkLevel(cls, month) : L.currentLevel(cls);
         return classGroupId(cls, level) === group.id;
@@ -2651,15 +3148,25 @@
         if (group.id === 'CUSTOM') return L.currentName(a).localeCompare(L.currentName(b), 'vi');
         var left = mode === 'homework' ? L.homeworkLevel(a, month) : L.currentLevel(a);
         var right = mode === 'homework' ? L.homeworkLevel(b, month) : L.currentLevel(b);
-        return L.gradeIndex(left.gradeId) - L.gradeIndex(right.gradeId) || (left.number || 0) - (right.number || 0);
+        if (!left || !right) return L.currentName(a).localeCompare(L.currentName(b), 'vi');
+        return L.gradeIndex(left.gradeId) - L.gradeIndex(right.gradeId) || (Number(left.number) || 0) - (Number(right.number) || 0);
       });
       var cards = list.length ? list.map(function (cls) { return folderCard(cls, now, mode); }).join('') : '<p class="muted">Chưa có lớp trong nhóm này.</p>';
       return '<section class="group-block group-' + group.id.toLowerCase() + '"><h3>' + esc(group.label) + '</h3><div class="folder-grid">' + cards + '</div></section>';
     }).join('');
+    var knownGroup = {};
+    L.GROUPS.forEach(function (group) { knownGroup[group.id] = true; });
+    var loose = state.classes.filter(function (cls) {
+      var level = mode === 'homework' ? L.homeworkLevel(cls, month) : L.currentLevel(cls);
+      return !knownGroup[classGroupId(cls, level)];
+    });
+    if (!loose.length) return html;
+    return html + '<section class="group-block group-custom"><h3>Lớp chưa vào nhóm</h3><div class="folder-grid">' +
+      loose.map(function (cls) { return folderCard(cls, now, mode); }).join('') + '</div></section>';
   }
 
   function viewHomework() {
-    return shell('<div class="section-head"><div><button type="button" class="btn" data-act="nav" data-screen="menu">← Menu</button>' +
+    return shell('<div class="section-head"><div><span class="nav-pair"><button type="button" class="btn" data-act="nav" data-screen="menu">← Menu</button>' + homeButton() + '</span>' +
       '<h2>Theo dõi chuyên cần</h2></div></div>' +
       '<p class="help">Homework progress dùng cùng thư mục lớp với mục A. Chuyên cần tính từ tháng lớp được thiết lập. Lớp khởi điểm giữ trình độ cũ trong tháng lên cấp. Lớp add-in chuyển sang trình độ mới ngay trong tháng đó. Ô buổi đã qua, kể cả buổi trước ngày học viên vào lớp, vẫn đánh dấu được.</p>' +
       summaryHtml(currentWeekStats(null)) + groupBlocks('homework'));
@@ -2781,7 +3288,7 @@
         '<p class="help">Cập nhật Excel ghi dấu từ hàng 2 theo ngày của lớp, kể cả tháng đã qua. Cột lệch ngày dán vào buổi gần nhất chưa có dữ liệu.</p>' +
         (pick ? '<p class="help">Tick một hoặc nhiều học viên để xuất hoặc in riêng. Không tick thì xuất hoặc in cả danh sách tháng này. Print (in) mở hộp thoại in của máy.</p>' : '')
       : '<p class="help">Tài khoản này không xuất và không in bảng chuyên cần.</p>';
-    return shell('<div class="section-head"><div><button type="button" class="btn" data-act="nav" data-screen="homework">← Chuyên cần</button>' +
+    return shell('<div class="section-head"><div><span class="nav-pair"><button type="button" class="btn" data-act="nav" data-screen="homework">← Chuyên cần</button>' + homeButton() + '</span>' +
       '<h2>' + esc(levelName) + '</h2><p class="meta">' + esc(gradeText(grade, cls)) + ' · ' + esc(kindLabel(cls)) + ' · ' + esc(L.scheduleText(cls)) + '</p>' + held + '</div>' +
       '<div class="btn-row"><button type="button" class="btn" data-act="hw-month" data-dir="-1"' + (ui.hwMonth === bounds.first ? ' disabled' : '') + '>‹ Tháng trước</button>' +
       '<strong>' + esc(L.monthLabel(ui.hwMonth)) + '</strong>' +
@@ -2994,8 +3501,8 @@
     }).join('');
     var body = '<p class="help">Hàng 1 là tiêu đề. Học viên được lấy từ hàng 2 trở xuống, mỗi người một hàng. File mẫu có sẵn đúng thứ tự cột.</p>' +
       '<ol class="col-list">' + cols + '</ol>' +
-      '<p class="help">Ngày sinh ghi DD/MM/YYYY. Học viên mới thiếu tên tiếng Anh, giới tính, ngày sinh, số điện thoại hoặc EC thì ghi ?. Mã để trống sẽ được cấp tự động. Hàng trùng mã thì bỏ qua. Mã đang nằm trong Học viên cũ/kết thúc không ghi đè bằng Excel. Dùng Thêm học viên để cho em vào lại lớp.</p>' +
-      '<p class="help">Nếu tên trùng học viên đang có trong lớp, file chỉ bổ sung ô còn thiếu (?, - hoặc trống) và không tạo thêm người trùng tên. Tên mới vẫn được thêm. Sĩ số có số thứ tự tối đa 20.</p>' +
+      '<p class="help">Ngày sinh ghi DD/MM/YYYY. Học viên mới thiếu tên tiếng Anh, giới tính, ngày sinh, số điện thoại hoặc EC thì ghi ?. Mã để trống sẽ được cấp tự động. Mã đã có sẵn trong chính lớp này thì bỏ qua. Mã trong Học viên cũ/kết thúc không ghi đè bằng Excel. Dùng Thêm học viên để cho em vào lại lớp.</p>' +
+      '<p class="help">Nếu tên trùng học viên đang có trong lớp, file chỉ bổ sung ô còn thiếu (?, - hoặc trống) và không tạo thêm người trùng tên. Tên hoặc mã trùng học viên chính thức đang học ở lớp khác sẽ mở Trùng học viên để chuyển hoặc thêm mới, không chặn các học viên khác trong file. Sĩ số có số thứ tự tối đa 20.</p>' +
       '<label class="field"><span>File Excel (.xlsx, .xls)</span><input id="excel-file" type="file" accept=".xlsx,.xls,.xlsm,.xlsb"></label>' +
       '<div id="import-status" class="import-status"></div>';
     var footer = '<button type="button" class="btn" data-act="download-template">Tải file mẫu</button>' +
@@ -3032,7 +3539,10 @@
         var cls = findClass(ui.classId);
         ui.importDraft = cls ? L.rowsToClassUpdate(cls, rows, state.classes, state.archive) : { students: [], updates: [], errors: ['Không thấy lớp.'] };
         ui.importDraft.mode = 'students';
-        var message = 'Đọc được ' + ui.importDraft.updates.length + ' học viên cần bổ sung và ' + ui.importDraft.students.length + ' học viên mới.';
+        var linkCount = ui.importDraft.links ? ui.importDraft.links.length : 0;
+        var message = 'Đọc được ' + ui.importDraft.updates.length + ' học viên cần bổ sung, ' + ui.importDraft.students.length + ' học viên mới';
+        if (linkCount) message += ' và ' + linkCount + ' học viên trùng lớp khác';
+        message += '.';
         if (ui.importDraft.errors.length) message += ' ' + ui.importDraft.errors.length + ' hàng cần xem lại.';
         setImportStatus(message, ui.importDraft.errors);
       } catch (err) {
@@ -3057,11 +3567,12 @@
     var draft = ui.importDraft;
     var updates = draft && draft.updates ? draft.updates : [];
     var fresh = draft && draft.students ? draft.students : [];
+    var links = draft && draft.links ? draft.links : [];
     if (!draft || draft.mode === 'homework') {
       showFormError('Chọn file Excel có học viên từ hàng 2.');
       return;
     }
-    if (!updates.length && !fresh.length) {
+    if (!updates.length && !fresh.length && !links.length) {
       if (draft.errors && draft.errors.length) {
         showFormError(draft.errors[0]);
         setImportStatus(draft.errors[0], draft.errors);
@@ -3072,19 +3583,19 @@
     }
     var cls = findClass(ui.classId);
     if (!cls) return;
-    var blocked = fresh.length > 0 && listedCount(cls, new Date()) + fresh.length > 20;
-    if (blocked && !updates.length) {
-      showFormError(ROSTER_FULL);
-      return;
-    }
     updates.forEach(function (item) {
       var stu = null;
       cls.students.forEach(function (row) { if (row.id === item.id) stu = row; });
       if (!stu || !item.patch) return;
       Object.keys(item.patch).forEach(function (key) { stu[key] = item.patch[key]; });
     });
+    var overCap = fresh.length > 0 && listedCount(cls, new Date()) + fresh.length > 20;
+    if (overCap && !updates.length && !links.length) {
+      showFormError(ROSTER_FULL);
+      return;
+    }
     var added = 0;
-    if (!blocked) {
+    if (!overCap) {
       var joinedAt = new Date().toISOString();
       fresh.forEach(function (row) {
         row.originClassId = cls.id;
@@ -3093,14 +3604,42 @@
         added += 1;
       });
     }
+    var pending = links.map(function (link) {
+      var payload = {
+        code: link.student && link.student.code ? link.student.code : '',
+        name: link.student && link.student.name ? link.student.name : '?',
+        englishName: link.student && link.student.englishName ? link.student.englishName : '?',
+        gender: link.student && link.student.gender ? link.student.gender : '?',
+        dob: link.student && link.student.dob ? link.student.dob : '?',
+        phone: link.student && link.student.phone ? link.student.phone : '?',
+        ec: link.student && link.student.ec ? link.student.ec : '?',
+        enroll: 'official',
+        joinedAt: new Date().toISOString(),
+        originClassId: cls.id
+      };
+      return { payload: payload, hits: link.hits || [] };
+    });
     ui.importDraft = null;
-    ui.modal = null;
     ui.formError = '';
-    save();
     var message = '';
     if (updates.length) message += 'Đã bổ sung thông tin cho ' + updates.length + ' học viên. ';
     if (added) message += 'Đã thêm ' + added + ' học viên. ';
-    if (blocked) message += ROSTER_FULL;
+    if (overCap) message += ROSTER_FULL + ' ';
+    if (updates.length || added) save();
+    if (pending.length && listedCount(cls, new Date()) < 20) {
+      var first = pending.shift();
+      ui.modal = { type: 'dup-student', payload: first.payload, hits: first.hits, queue: pending };
+      if (message.trim()) toast(message.trim());
+      render();
+      return;
+    }
+    if (pending.length) message += ROSTER_FULL;
+    ui.modal = null;
+    if (!updates.length && !added && !(message.trim())) {
+      toast('Không thêm học viên trùng vì sĩ số đã đủ.');
+      render();
+      return;
+    }
     toast(message.trim());
     render();
   }
@@ -3208,6 +3747,22 @@
     var footer = (options.length ? '<button type="button" class="btn btn-primary" data-act="confirm-transfer">Xác nhận</button>' : '') +
       '<button type="button" class="btn" data-act="close-modal">Hủy</button>';
     return modalShell('Chuyển lớp', body, footer);
+  }
+
+  function transferAskForm() {
+    return modalShell('Đề xuất sự vụ',
+      '<p>bạn có muốn lấy nội dung đề xuất sự vụ không?</p>',
+      '<button type="button" class="btn btn-primary" data-act="transfer-report-yes">Yes</button>' +
+      '<button type="button" class="btn btn-danger" data-act="close-modal">no</button>');
+  }
+
+  function copyForm() {
+    var text = ui.modal && ui.modal.text ? ui.modal.text : '';
+    return modalShell('Nội dung báo cáo',
+      '<p class="help">Bấm bút copy rồi dán. Nội dung giữ xuống dòng.</p>' +
+      '<textarea id="report-text" class="report-text" readonly>' + esc(text) + '</textarea>',
+      '<button type="button" class="btn btn-primary" data-act="copy-report">' + penSvg() + '<span>Copy</span></button>' +
+      '<button type="button" class="btn" data-act="close-modal">Đóng</button>');
   }
 
   function confirmForm() {
@@ -3335,7 +3890,7 @@
     var postBody = posts.length ? posts.map(feedCard).join('') : '<p class="muted">Chưa có thông báo nhân sự trong tháng này.</p>';
     var systemBody = systems.length ? systems.map(feedCard).join('') : '<p class="muted">Chưa có thay đổi data trong tháng này.</p>';
     var suggest = canSuggest() ? '<button type="button" class="btn btn-primary" data-act="suggest-open">Đề xuất</button>' : '';
-    return shell('<div class="section-head"><div><button type="button" class="btn" data-act="nav" data-screen="menu">← Menu</button>' +
+    return shell('<div class="section-head"><div><span class="nav-pair"><button type="button" class="btn" data-act="nav" data-screen="menu">← Menu</button>' + homeButton() + '</span>' +
       '<h2>Thông báo và đề xuất</h2>' +
       '<p class="help">Mục này là thông báo nhân sự đăng. Thông báo data chỉ ở menu chính. Bấm biểu tượng trên bảng để xem đủ theo tháng.</p></div>' +
       '<div class="btn-row">' + suggest + '</div></div>' +
@@ -3417,7 +3972,7 @@
         });
       });
       var formerN = (state.archive || []).length;
-      return shell('<div class="section-head"><div><button type="button" class="btn" data-act="nav" data-screen="menu">← Menu</button>' +
+      return shell('<div class="section-head"><div><span class="nav-pair"><button type="button" class="btn" data-act="nav" data-screen="menu">← Menu</button>' + homeButton() + '</span>' +
         '<h2>Thư viện học viên</h2></div></div>' +
         '<p class="help">Official gồm học viên chính thức và học bổng đang có số thứ tự trên danh sách lớp. Học viên cũ/kết thúc dành cho các em đã dừng học hoặc hết hạn. Học viên xóa ở mục A không vào danh sách này.</p>' +
         '<div class="archive-grid">' +
@@ -3453,7 +4008,7 @@
     }).join('') : '<tr><td colspan="' + cols + '">Không có học viên khớp bộ lọc.</td></tr>';
     var purge = pick ? '<div class="btn-row"><button type="button" class="btn btn-danger" data-act="archive-purge">Xóa vĩnh viễn</button></div>' +
       '<p class="help">Danh sách này dành cho học viên đã dừng học, sau 7 ngày, và các em hết hạn Trial, học bổng hoặc outdated. Admin chọn học viên ở đây để xóa vĩnh viễn khỏi data.</p>' : '';
-    return shell('<div class="section-head"><div><button type="button" class="btn" data-act="archive-back">← Thư viện</button>' +
+    return shell('<div class="section-head"><div><span class="nav-pair"><button type="button" class="btn" data-act="archive-back">← Thư viện</button>' + homeButton() + '</span>' +
       '<h2>' + esc(title) + '</h2></div></div>' +
       '<div class="filter-bar">' +
       '<label class="field filter-field"><span>Tìm kiếm</span><input id="archive-q" value="' + esc(ui.archiveQuery || '') + '" placeholder="Tên, mã, tên tiếng Anh, lớp"></label>' +
@@ -3533,6 +4088,8 @@
     if (ui.modal.type === 'import-students') return importForm();
     if (ui.modal.type === 'import-homework') return homeworkImportForm();
     if (ui.modal.type === 'transfer') return transferForm();
+    if (ui.modal.type === 'transfer-ask') return transferAskForm();
+    if (ui.modal.type === 'copy') return copyForm();
     if (ui.modal.type === 'expire') return expireForm();
     if (ui.modal.type === 'confirm') return confirmForm();
     if (ui.modal.type === 'hw-mark') return hwMarkForm();
@@ -3541,7 +4098,24 @@
     if (ui.modal.type === 'move-session') return moveForm();
     if (ui.modal.type === 'suggest') return suggestForm();
     if (ui.modal.type === 'edit-staff') return staffForm();
+    if (ui.modal.type === 'dup-student') return dupStudentForm();
     return '';
+  }
+
+  function dupStudentForm() {
+    var hits = ui.modal && ui.modal.hits ? ui.modal.hits : [];
+    var rows = hits.map(function (hit) {
+      return '<article class="dup-hit"><p><b>' + esc(hit.name) + '</b></p>' +
+        '<p>Mã học viên: ' + esc(hit.code || '—') + '</p>' +
+        '<p>Lớp đang học: ' + esc(hit.className) + '</p>' +
+        '<p>Ngày thêm vào lớp: ' + esc(hit.joined ? L.formatDMY(hit.joined) : '—') + '</p>' +
+        '<button type="button" class="btn btn-primary" data-act="dup-transfer" data-id="' + esc(hit.id) + '" data-from="' + esc(hit.fromId) + '">Chuyển học viên vào đây và cập nhật thông tin</button></article>';
+    }).join('');
+    return modalShell('Trùng học viên',
+      '<p>Có học viên chính thức đang học ở lớp khác trùng họ tên hoặc trùng mã.</p>' + rows +
+      '<p class="help">Bỏ qua sẽ giữ học viên ở lớp cũ và thêm một học viên mới tại đây. Nếu mã đang thuộc học viên lớp cũ, học viên mới nhận mã khác.</p>',
+      '<button type="button" class="btn btn-danger" data-act="dup-skip">Bỏ qua và tiếp tục thêm</button>' +
+      '<button type="button" class="btn" data-act="close-modal">Hủy</button>');
   }
 
   function staffForm() {
@@ -3622,12 +4196,452 @@
         '<p class="staff-hours">Giờ Teaching: <b>' + esc(L.formatHours(minutes)) + '</b></p>' +
         '<p>Giờ SOA: ' + esc(soaValue || '—') + '</p>' + editBtn + '</article>';
     }).join('');
-    return shell('<div class="section-head"><div><button type="button" class="btn" data-act="nav" data-screen="menu">← Menu</button>' +
+    return shell('<div class="section-head"><div><span class="nav-pair"><button type="button" class="btn" data-act="nav" data-screen="menu">← Menu</button>' + homeButton() + '</span>' +
       '<h2>Công giáo viên</h2><p class="meta">Mục H</p></div></div>' +
       '<label class="field dash-month"><span>Tháng</span><input id="staff-month" type="month" value="' + esc(month) + '"></label>' +
       '<p class="help">Giờ Teaching cộng mỗi buổi trong tháng theo khung giờ của lớp. Một buổi 5:30–7:30 là 2 giờ, tháng cộng mọi buổi của giáo viên đó. Giờ SOA là giờ OFFICE. Admin bấm Sửa thông tin để cập nhật mã nhân sự và giờ SOA của tháng đang xem. Khối Interview, event và Lớp EB trên lịch Mục B là thẻ riêng, không cộng vào ô này và không tính giờ Teaching.</p>' +
       (canEdit() ? '' : '<p class="help">Tài khoản này chỉ xem công giáo viên.</p>') +
       '<div class="staff-grid-cards">' + (cards || '<p class="muted">Chưa có FET.</p>') + '</div>' + modalHtml());
+  }
+
+  var dictTimer = null;
+  var dictSeq = 0;
+  var dictLook = 0;
+  var dictAudioCtx = null;
+
+  function dictPosVi(pos) {
+    var key = String(pos || '').toLowerCase();
+    var map = {
+      noun: 'danh từ',
+      verb: 'động từ',
+      adjective: 'tính từ',
+      adverb: 'trạng từ',
+      interjection: 'thán từ',
+      exclamation: 'thán từ',
+      pronoun: 'đại từ',
+      preposition: 'giới từ',
+      conjunction: 'liên từ',
+      determiner: 'hạn định từ',
+      article: 'mạo từ',
+      numeral: 'số từ',
+      n: 'danh từ',
+      v: 'động từ',
+      adj: 'tính từ',
+      adv: 'trạng từ',
+      u: 'thán từ'
+    };
+    return map[key] || key;
+  }
+
+  function dictLooksVi(text) {
+    return /[ăâêôơưđáàảãạắằẳẵặấầẩẫậéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừửữựýỳỷỹỵ]/i.test(String(text || ''));
+  }
+
+  function dictTranslate(text, pair) {
+    var q = String(text || '').trim();
+    if (!q) return Promise.resolve('');
+    var url = 'https://api.mymemory.translated.net/get?q=' + encodeURIComponent(q.slice(0, 450)) + '&langpair=' + pair;
+    return fetch(url).then(function (res) { return res.json(); }).then(function (data) {
+      var out = data && data.responseData && data.responseData.translatedText;
+      if (!out || /MYMEMORY WARNING|INVALID SOURCE/i.test(out)) return '';
+      return String(out).trim();
+    }).catch(function () { return ''; });
+  }
+
+  function dictPaintSuggest(items) {
+    ui.dict.suggestions = items || [];
+    var box = document.getElementById('dict-suggest');
+    if (!box) return;
+    if (!ui.dict.suggestions.length) {
+      box.hidden = true;
+      box.innerHTML = '';
+      return;
+    }
+    box.hidden = false;
+    box.innerHTML = ui.dict.suggestions.map(function (item) {
+      return '<button type="button" data-act="dict-pick" data-word="' + esc(item.word) + '">' + esc(item.label) + '</button>';
+    }).join('');
+  }
+
+  function dictSuggest(seq, text) {
+    var raw = String(text || '').trim();
+    if (raw.length < 2) { if (seq === dictSeq) dictPaintSuggest([]); return; }
+    var job = dictLooksVi(raw)
+      ? dictTranslate(raw, 'vi|en').then(function (english) {
+        var word = String(english || '').trim().toLowerCase();
+        if (!word || word === raw.toLowerCase()) return [];
+        return [{ word: word, label: raw + ' → ' + word }];
+      })
+      : fetch('https://api.datamuse.com/sug?s=' + encodeURIComponent(raw) + '&max=8').then(function (res) {
+        return res.json();
+      }).then(function (rows) {
+        return (rows || []).map(function (item) {
+          return { word: item.word, label: item.word };
+        }).filter(function (item) { return item.word; });
+      }).catch(function () { return []; });
+    job.then(function (items) {
+      if (seq !== dictSeq || ui.screen !== 'dictionary') return;
+      dictPaintSuggest(items);
+    });
+  }
+
+  function dictAccent(name) {
+    var blob = String(name || '').toLowerCase();
+    if (blob.indexOf('uk') >= 0 || blob.indexOf('_gb') >= 0 || blob.indexOf('-gb') >= 0) return 'Anh (UK)';
+    if (blob.indexOf('us') >= 0 || blob.indexOf('_us') >= 0 || blob.indexOf('-us') >= 0) return 'Mỹ (US)';
+    if (blob.indexOf('au') >= 0) return 'Úc (AU)';
+    return 'Phát âm';
+  }
+
+  function dictCommons(id) {
+    var url = 'https://commons.wikimedia.org/w/api.php?action=query&pageids=' + encodeURIComponent(id) +
+      '&prop=imageinfo&iiprop=url|mime&format=json&origin=*';
+    return fetch(url).then(function (res) { return res.json(); }).then(function (data) {
+      var pages = data && data.query && data.query.pages || {};
+      var page = pages[id] || pages[Object.keys(pages)[0]];
+      var info = page && page.imageinfo && page.imageinfo[0];
+      if (!info || !info.url) return null;
+      return { url: info.url, mime: info.mime || '', title: page.title || '' };
+    }).catch(function () { return null; });
+  }
+
+  function dictAudios(word, phonetics) {
+    var jobs = [];
+    if (/^[a-z]+$/.test(word)) {
+      jobs.push(Promise.resolve({
+        label: 'Anh (UK) · Google Dictionary',
+        playUrl: 'https://ssl.gstatic.com/dictionary/static/sounds/20200429/' + word + '--_gb_1.mp3',
+        copyUrl: '',
+        source: 'Google Dictionary',
+        fileName: word + '-uk.mp3'
+      }));
+    }
+    (phonetics || []).forEach(function (item) {
+      var source = item && item.sourceUrl || '';
+      var found = String(source).match(/curid=(\d+)/);
+      if (!found) return;
+      jobs.push(dictCommons(found[1]).then(function (file) {
+        if (!file) return null;
+        var title = String(file.title || '').replace(/^File:/, '');
+        return {
+          label: dictAccent(title || item.audio) + ' · Wikimedia Commons',
+          playUrl: file.url,
+          copyUrl: file.url,
+          source: 'Wikimedia Commons',
+          fileName: title || (word + '.ogg')
+        };
+      }));
+    });
+    return Promise.all(jobs).then(function (rows) {
+      var seen = {};
+      return rows.filter(function (row) {
+        if (!row || !row.playUrl || seen[row.playUrl]) return false;
+        seen[row.playUrl] = true;
+        return true;
+      });
+    });
+  }
+
+  function dictSynMap(word) {
+    return fetch('https://api.datamuse.com/words?rel_syn=' + encodeURIComponent(word) + '&md=p&max=20').then(function (res) {
+      return res.json();
+    }).then(function (rows) {
+      var map = {};
+      (rows || []).forEach(function (item) {
+        if (!item || !item.word) return;
+        var tags = item.tags || [];
+        for (var i = 0; i < tags.length; i++) {
+          var label = dictPosVi(tags[i]);
+          if (label && label !== tags[i]) { map[item.word.toLowerCase()] = label; return; }
+        }
+      });
+      return map;
+    }).catch(function () { return {}; });
+  }
+
+  function dictApplyVi(senses, text) {
+    var map = {};
+    String(text || '').split(/\n/).forEach(function (line) {
+      var found = String(line).match(/^\[\[(\d+)(x)?\]\]\s*(.*)$/);
+      if (found) map[found[1] + (found[2] || '')] = found[3];
+    });
+    var n = 0;
+    senses.forEach(function (sense) {
+      sense.glosses.forEach(function (gloss) {
+        gloss.vi = map[String(n)] || '';
+        gloss.exampleVi = map[n + 'x'] || '';
+        n += 1;
+      });
+    });
+  }
+
+  function dictBuild(raw) {
+    var word = String(raw.word || '').toLowerCase();
+    var senses = [];
+    (raw.meanings || []).forEach(function (meaning) {
+      if (senses.length >= 4) return;
+      var glosses = [];
+      var syns = (meaning.synonyms || []).slice();
+      (meaning.definitions || []).forEach(function (def) {
+        if (glosses.length >= 2 || !def || !def.definition) return;
+        glosses.push({ en: def.definition, vi: '', example: def.example || '', exampleVi: '' });
+        (def.synonyms || []).forEach(function (item) { syns.push(item); });
+      });
+      if (!glosses.length) return;
+      var seen = {};
+      var synonyms = [];
+      syns.forEach(function (item) {
+        var name = String(item || '').trim();
+        var key = name.toLowerCase();
+        if (!name || seen[key]) return;
+        seen[key] = true;
+        synonyms.push(name);
+      });
+      senses.push({
+        pos: meaning.partOfSpeech || '',
+        posVi: dictPosVi(meaning.partOfSpeech || ''),
+        glosses: glosses,
+        synonyms: synonyms.slice(0, 8)
+      });
+    });
+    var ipa = [];
+    (raw.phonetics || []).forEach(function (item) {
+      if (item && item.text && ipa.indexOf(item.text) < 0) ipa.push(item.text);
+    });
+    var lines = [];
+    var n = 0;
+    senses.forEach(function (sense) {
+      sense.glosses.forEach(function (gloss) {
+        lines.push('[[' + n + ']] ' + gloss.en);
+        if (gloss.example) lines.push('[[' + n + 'x]] ' + gloss.example);
+        n += 1;
+      });
+    });
+    return Promise.all([
+      dictAudios(word, raw.phonetics || []),
+      dictSynMap(word),
+      dictTranslate(word, 'en|vi'),
+      lines.length ? dictTranslate(lines.join('\n'), 'en|vi') : Promise.resolve('')
+    ]).then(function (pack) {
+      var posMap = pack[1];
+      dictApplyVi(senses, pack[3]);
+      senses.forEach(function (sense) {
+        sense.synonyms = sense.synonyms.map(function (name) {
+          return { word: name, pos: posMap[name.toLowerCase()] || sense.posVi || '' };
+        });
+      });
+      return { word: word, ipa: ipa.join(' · '), vi: pack[2] || '', audios: pack[0], senses: senses };
+    });
+  }
+
+  function dictLookup(raw) {
+    var text = String(raw || '').trim();
+    if (!text) { toast('Hãy nhập một từ.'); return; }
+    var id = ++dictLook;
+    ui.dict.query = text;
+    ui.dict.status = 'loading';
+    ui.dict.message = '';
+    ui.dict.entry = null;
+    ui.dict.suggestions = [];
+    render();
+    var prepare = dictLooksVi(text) ? dictTranslate(text, 'vi|en') : Promise.resolve(text);
+    prepare.then(function (english) {
+      var word = String(english || text).trim().toLowerCase();
+      return fetch('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(word)).then(function (res) {
+        if (!res.ok) throw new Error('missing');
+        return res.json();
+      });
+    }).then(function (rows) {
+      if (!rows || !rows[0]) throw new Error('missing');
+      return dictBuild(rows[0]);
+    }).then(function (entry) {
+      if (id !== dictLook) return;
+      ui.dict.entry = entry;
+      ui.dict.query = entry.word || ui.dict.query;
+      ui.dict.status = 'ready';
+      ui.dict.tab = 'mean';
+      render();
+    }).catch(function () {
+      if (id !== dictLook) return;
+      ui.dict.status = 'error';
+      ui.dict.message = 'Không thấy mục từ này trong từ điển tiếng Anh.';
+      render();
+    });
+  }
+
+  function dictDownload(file) {
+    var link = document.createElement('a');
+    var url = URL.createObjectURL(file);
+    link.href = url;
+    link.download = file.name;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+  }
+
+  function dictPutFile(blob, filename) {
+    var type = blob.type || 'application/octet-stream';
+    var file = new File([blob], filename, { type: type });
+    var clip = '';
+    if (window.ClipboardItem && ClipboardItem.supports) {
+      if (ClipboardItem.supports(type)) clip = type;
+      else if (ClipboardItem.supports('web ' + type)) clip = 'web ' + type;
+    }
+    function saved() {
+      dictDownload(file);
+      toast('Đã tải ' + filename + '. Gửi file này vào Zalo.');
+    }
+    if (!clip || !navigator.clipboard || !navigator.clipboard.write) { saved(); return Promise.resolve(); }
+    var data = {};
+    data[clip] = blob;
+    return navigator.clipboard.write([new ClipboardItem(data)]).then(function () {
+      toast('Đã copy ' + filename + '. Dán bằng Ctrl+V.');
+    }).catch(saved);
+  }
+
+  function dictPrimeAudio() {
+    var Ctor = window.AudioContext || window.webkitAudioContext;
+    if (!Ctor) return null;
+    if (!dictAudioCtx) dictAudioCtx = new Ctor();
+    if (dictAudioCtx.state === 'suspended') dictAudioCtx.resume();
+    return dictAudioCtx;
+  }
+
+  function dictToVideo(blob, word, ipa) {
+    var ctx = dictPrimeAudio();
+    if (!ctx || !window.MediaRecorder) return Promise.reject(new Error('recorder'));
+    var mime = '';
+    ['video/mp4', 'video/webm;codecs=vp8,opus', 'video/webm'].some(function (item) {
+      if (MediaRecorder.isTypeSupported(item)) { mime = item; return true; }
+      return false;
+    });
+    if (!mime) return Promise.reject(new Error('recorder'));
+    return blob.arrayBuffer().then(function (buffer) {
+      return ctx.decodeAudioData(buffer.slice(0));
+    }).then(function (audioBuf) {
+      return new Promise(function (resolve, reject) {
+        try {
+          var dest = ctx.createMediaStreamDestination();
+          var source = ctx.createBufferSource();
+          source.buffer = audioBuf;
+          source.connect(dest);
+          var canvas = document.createElement('canvas');
+          canvas.width = 640;
+          canvas.height = 360;
+          var pen = canvas.getContext('2d');
+          pen.fillStyle = '#0c4a72';
+          pen.fillRect(0, 0, 640, 360);
+          pen.fillStyle = '#fff6d8';
+          pen.font = '700 56px sans-serif';
+          pen.fillText(word || 'Ocean EDU', 36, 160);
+          pen.font = '600 28px sans-serif';
+          pen.fillText(ipa || '', 36, 220);
+          var videoTrack = canvas.captureStream(12).getVideoTracks()[0];
+          var audioTrack = dest.stream.getAudioTracks()[0];
+          var stream = new MediaStream([videoTrack, audioTrack]);
+          var recorder = new MediaRecorder(stream, { mimeType: mime });
+          var chunks = [];
+          recorder.ondataavailable = function (event) {
+            if (event.data && event.data.size) chunks.push(event.data);
+          };
+          recorder.onerror = function () { reject(new Error('recorder')); };
+          recorder.onstop = function () {
+            videoTrack.stop();
+            source.disconnect();
+            var type = mime.split(';')[0];
+            resolve(new Blob(chunks, { type: type }));
+          };
+          recorder.start();
+          source.start();
+          setTimeout(function () {
+            if (recorder.state !== 'inactive') recorder.stop();
+          }, Math.max(700, Math.ceil(audioBuf.duration * 1000) + 200));
+        } catch (err) { reject(err); }
+      });
+    });
+  }
+
+  function dictCopy(index, asVideo) {
+    var entry = ui.dict.entry;
+    var audio = entry && entry.audios && entry.audios[index];
+    if (!audio || !audio.copyUrl) {
+      toast('Bản này chỉ nghe trên trình duyệt. Hãy copy bản Wikimedia Commons.');
+      return;
+    }
+    dictPrimeAudio();
+    toast(asVideo ? 'Đang đóng file video...' : 'Đang lấy file phát âm...');
+    fetch(audio.copyUrl).then(function (res) {
+      if (!res.ok) throw new Error('audio');
+      return res.blob();
+    }).then(function (blob) {
+      if (!asVideo) return dictPutFile(blob, audio.fileName || ((entry.word || 'word') + '.ogg'));
+      return dictToVideo(blob, entry.word, entry.ipa).then(function (video) {
+        var ext = video.type.indexOf('mp4') >= 0 ? 'mp4' : 'webm';
+        return dictPutFile(video, (entry.word || 'word') + '.' + ext);
+      });
+    }).catch(function () {
+      toast(asVideo ? 'Không tạo được file video từ bản ghi này.' : 'Không lấy được file phát âm từ nguồn mạng.');
+    });
+  }
+
+  function dictSenseHtml(sense, other) {
+    var glosses = sense.glosses.map(function (gloss) {
+      return '<p class="dict-en">' + esc(gloss.en) + '</p>' +
+        (gloss.vi ? '<p class="dict-vi-def">' + esc(gloss.vi) + '</p>' : '') +
+        (gloss.example ? '<p class="dict-example">' + esc(gloss.example) + '</p>' : '') +
+        (gloss.exampleVi ? '<p class="dict-example-vi">' + esc(gloss.exampleVi) + '</p>' : '');
+    }).join('');
+    var syn = sense.synonyms.length
+      ? '<p class="dict-syn">Đồng nghĩa: ' + sense.synonyms.map(function (item) {
+        return esc(item.word) + (item.pos ? ' (' + esc(item.pos) + ')' : '');
+      }).join(', ') + '</p>'
+      : '';
+    return '<article class="dict-sense"><h3><span class="dict-pos">' + esc(sense.posVi || 'từ') + '</span> ' +
+      (other ? 'Nghĩa khác' : 'Nghĩa chính') + '</h3>' + glosses + syn + '</article>';
+  }
+
+  function dictAudioHtml(entry) {
+    if (!entry.audios.length) return '<p class="help">Chưa có file phát âm mở cho từ này.</p>';
+    return entry.audios.map(function (audio, index) {
+      var copy = audio.copyUrl
+        ? '<div class="btn-row"><button type="button" class="btn" data-act="dict-copy-audio" data-index="' + index + '">Copy audio</button>' +
+          '<button type="button" class="btn" data-act="dict-copy-mp4" data-index="' + index + '">Copy mp4</button></div>' +
+          '<p class="help">Copy audio lấy file gốc. Copy mp4 gắn phát âm vào một video ngắn để dán vào Zalo khi khung chat không nhận file âm thanh.</p>'
+        : '<p class="help">Nguồn này phát trong trình duyệt. Muốn copy file thì dùng bản Wikimedia Commons.</p>';
+      return '<article class="dict-audio-row"><h3>' + esc(audio.label) + '</h3>' +
+        '<audio class="dict-player" controls preload="none" src="' + esc(audio.playUrl) + '"></audio>' +
+        '<p class="help">Nguồn: ' + esc(audio.source) + '</p>' + copy + '</article>';
+    }).join('');
+  }
+
+  function viewDictionary() {
+    var d = ui.dict;
+    var body = '';
+    if (d.status === 'loading') body = '<p class="help">Đang tra từ điển...</p>';
+    else if (d.status === 'error') body = '<p class="help">' + esc(d.message || 'Không tra được từ.') + '</p>';
+    else if (d.entry) {
+      var entry = d.entry;
+      var tabs = '<div class="btn-row dict-tabs">' +
+        '<button type="button" class="btn' + (d.tab !== 'audio' ? ' btn-primary' : '') + '" data-act="dict-tab" data-tab="mean">Nghĩa</button>' +
+        '<button type="button" class="btn' + (d.tab === 'audio' ? ' btn-primary' : '') + '" data-act="dict-tab" data-tab="audio">Phát âm</button></div>';
+      var panel = d.tab === 'audio'
+        ? '<div id="dict-audio">' + dictAudioHtml(entry) + '</div>'
+        : '<div id="dict-mean">' + entry.senses.map(function (sense, index) { return dictSenseHtml(sense, index > 0); }).join('') + '</div>';
+      body = '<section class="dict-entry"><h2 class="dict-word">' + esc(entry.word) + '</h2>' +
+        (entry.ipa ? '<p class="dict-ipa">' + esc(entry.ipa) + '</p>' : '') +
+        (entry.vi ? '<p class="dict-vi">' + esc(entry.vi) + '</p>' : '<p class="help">Chưa có nghĩa tiếng Việt.</p>') +
+        tabs + panel + '</section>';
+    }
+    var suggests = (d.suggestions || []).map(function (item) {
+      return '<button type="button" data-act="dict-pick" data-word="' + esc(item.word) + '">' + esc(item.label) + '</button>';
+    }).join('');
+    return shell('<div class="section-head"><div><span class="nav-pair"><button type="button" class="btn" data-act="nav" data-screen="menu">← Menu</button>' + homeButton() + '</span>' +
+      '<h2>Dictionary</h2><p class="meta">Mục I</p><span class="comic-meta">Bản meta thử nghiệm</span></div></div>' +
+      '<p class="help">Tra như một từ điển: từ tiếng Anh, nghĩa tiếng Việt, định nghĩa hai thứ tiếng, các nghĩa theo loại từ, ví dụ và từ đồng nghĩa. Gõ tiếng Anh hoặc tiếng Việt để hiện gợi ý. File nghe lấy từ Google Dictionary và bản ghi mở trên Wikimedia Commons.</p>' +
+      '<label class="field dict-search"><span>Từ vựng</span><input id="dict-q" placeholder="tiếng Anh hoặc tiếng Việt" autocomplete="off" value="' + esc(d.query || '') + '">' +
+      '<div id="dict-suggest" class="dict-suggest"' + (suggests ? '' : ' hidden') + '>' + suggests + '</div></label>' +
+      body);
   }
 
   function render() {
@@ -3647,6 +4661,7 @@
       else if (ui.screen === 'curriculum') html = viewCurriculum();
       else if (ui.screen === 'exam') html = viewExam();
       else if (ui.screen === 'staff') html = viewStaff();
+      else if (ui.screen === 'dictionary') html = viewDictionary();
       else html = viewMenu();
       root.innerHTML = html;
     } catch (err) {
@@ -3660,13 +4675,28 @@
     applyAccountLook();
     pulseMinimal();
     paintDesk();
+    pinBars();
+    if (ui.screen === 'dictionary') {
+      document.querySelectorAll('audio.dict-player').forEach(function (el) {
+        el.addEventListener('error', function () {
+          var row = el.closest ? el.closest('.dict-audio-row') : null;
+          if (row) row.hidden = true;
+        });
+      });
+    }
+  }
+
+  function pinBars() {
+    var bar = document.querySelector('#app .topbar');
+    if (!bar) return;
+    document.documentElement.style.setProperty('--topbar-h', bar.offsetHeight + 'px');
   }
 
   function pulseMinimal() {
     var app = document.getElementById('app');
     if (!app) return;
     app.classList.remove('is-enter');
-    if (document.documentElement.getAttribute('data-skin') !== 'minimal') return;
+    if (document.documentElement.getAttribute('data-skin') !== 'goth') return;
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     void app.offsetWidth;
     app.classList.add('is-enter');
@@ -3928,7 +4958,8 @@
     var rejoinId = ui.modal && ui.modal.type === 'add-student' ? ui.modal.rejoinId : '';
     if (rejoinId && enroll === 'scholarship') { showFormError('Học viên cũ vào lại lớp bằng Chính thức hoặc Trial.'); return; }
     var except = ui.modal.type === 'edit-student' ? ui.modal.id : (rejoinId || null);
-    if (L.codeTaken(state.classes, code, except, state.archive)) { showFormError('Mã học viên đã tồn tại.'); return; }
+    var isFresh = ui.modal.type !== 'edit-student' && !rejoinId;
+    if (!isFresh && L.codeTaken(state.classes, code, except, state.archive)) { showFormError('Mã học viên đã tồn tại.'); return; }
     var room = findClass(ui.classId);
     var addingListed = enroll === 'official' || enroll === 'scholarship' || enroll === 'trial';
     if (enroll === 'trial' && bits[0]) {
@@ -3960,37 +4991,123 @@
       expiredAt: '',
       expireReason: ''
     };
+    if (!rejoinId) {
+      payload.joinedAt = new Date().toISOString();
+      if (enroll === 'trial' && bits[0]) {
+        var trialDate = L.parseDateInput(bits[0]);
+        if (trialDate) payload.joinedAt = L.atTime(trialDate, bits[1] || '00:00').toISOString();
+      }
+    }
     if (ui.modal.type === 'edit-student') {
       var found = findStudent(ui.modal.id);
       Object.keys(payload).forEach(function (key) { found.stu[key] = payload[key]; });
-    } else {
-      var cls = findClass(ui.classId);
-      var archived = null;
-      if (rejoinId) {
-        (state.archive || []).forEach(function (item) { if (item.id === rejoinId) archived = item; });
-        payload.id = rejoinId;
-        payload.joinedAt = new Date().toISOString();
-      } else {
-        payload.joinedAt = new Date().toISOString();
-        if (enroll === 'trial' && bits[0]) {
-          var trialDate = L.parseDateInput(bits[0]);
-          if (trialDate) payload.joinedAt = L.atTime(trialDate, bits[1] || '00:00').toISOString();
-        }
-      }
-      payload.originClassId = cls.id;
-      var made = L.createStudent(payload);
-      if (archived) {
-        made.notes = Array.isArray(archived.notes) ? archived.notes : [];
-        made.transfers = Array.isArray(archived.transfers) ? archived.transfers : [];
-        state.archive = (state.archive || []).filter(function (item) { return item.id !== rejoinId; });
-      }
-      cls.students.push(made);
+      ui.modal = null;
+      ui.formError = '';
+      save();
+      toast('Đã lưu học viên.');
+      render();
+      return;
     }
+    if (rejoinId) {
+      commitNewStudent(payload, rejoinId);
+      finishStudentSave('Đã lưu học viên.');
+      return;
+    }
+    var twins = enroll === 'official' ? L.findOfficialTwins(state.classes, name, room && room.id, code, new Date()) : [];
+    if (twins.length) {
+      ui.formError = '';
+      ui.modal = { type: 'dup-student', payload: payload, hits: twins, queue: [] };
+      render();
+      return;
+    }
+    if (L.codeTaken(state.classes, code, null, state.archive)) { showFormError('Mã học viên đã tồn tại.'); return; }
+    commitNewStudent(payload, '');
+    finishStudentSave('Đã lưu học viên.');
+  }
+
+  function fieldFilled(value) {
+    var text = String(value == null ? '' : value).trim();
+    return text !== '' && text !== '?' && text !== '-';
+  }
+
+  function overlayStudent(stu, payload) {
+    ['englishName', 'gender', 'dob', 'phone', 'ec'].forEach(function (key) {
+      if (fieldFilled(payload[key])) stu[key] = payload[key];
+    });
+    if (!fieldFilled(payload.code) || payload.code === stu.code) return;
+    if (!L.codeTaken(state.classes, payload.code, stu.id, state.archive)) stu.code = payload.code;
+  }
+
+  function commitNewStudent(payload, rejoinId) {
+    var cls = findClass(ui.classId);
+    if (!cls) return;
+    var archived = null;
+    if (rejoinId) {
+      (state.archive || []).forEach(function (item) { if (item.id === rejoinId) archived = item; });
+      payload.id = rejoinId;
+      payload.joinedAt = new Date().toISOString();
+    }
+    payload.originClassId = cls.id;
+    var made = L.createStudent(payload);
+    if (archived) {
+      made.notes = Array.isArray(archived.notes) ? archived.notes : [];
+      made.transfers = Array.isArray(archived.transfers) ? archived.transfers : [];
+      state.archive = (state.archive || []).filter(function (item) { return item.id !== rejoinId; });
+    }
+    cls.students.push(made);
+    return made;
+  }
+
+  function finishStudentSave(message) {
     ui.modal = null;
     ui.formError = '';
     save();
-    toast('Đã lưu học viên.');
+    toast(message || 'Đã lưu học viên.');
     render();
+  }
+
+  function continueTwinQueue(message) {
+    var queue = ui.modal && ui.modal.queue ? ui.modal.queue.slice() : [];
+    var room = findClass(ui.classId);
+    if (queue.length && room && listedCount(room, new Date()) >= 20) {
+      queue = [];
+      message = (message ? message + ' ' : '') + ROSTER_FULL;
+    }
+    if (!queue.length) {
+      finishStudentSave(message);
+      return;
+    }
+    var next = queue.shift();
+    ui.modal = { type: 'dup-student', payload: next.payload, hits: next.hits || [], queue: queue };
+    ui.formError = '';
+    save();
+    toast(message);
+    render();
+  }
+
+  function acceptTwin(id, fromId) {
+    if (deny(canEdit()) || !ui.modal || ui.modal.type !== 'dup-student' || !ui.modal.payload) return;
+    var room = findClass(ui.classId);
+    if (!room) return;
+    var result = L.transferStudents(state, fromId, room.id, [id], new Date());
+    if (result.error) { showFormError(result.error); return; }
+    var found = findStudent(id);
+    if (found) overlayStudent(found.stu, ui.modal.payload);
+    continueTwinQueue('Đã chuyển học viên trùng vào lớp này.');
+  }
+
+  function skipTwin() {
+    if (deny(canEdit()) || !ui.modal || ui.modal.type !== 'dup-student' || !ui.modal.payload) return;
+    var room = findClass(ui.classId);
+    if (room && listedCount(room, new Date()) >= 20) { showFormError(ROSTER_FULL); return; }
+    var payload = ui.modal.payload;
+    var typed = String(payload.code || '').trim();
+    var reassigned = !typed || L.codeTaken(state.classes, typed, null, state.archive);
+    if (reassigned) payload.code = L.nextStudentCode(state.classes, state.archive);
+    commitNewStudent(payload, '');
+    continueTwinQueue(reassigned
+      ? 'Đã thêm học viên mới. Mã trùng nên đã cấp ' + payload.code + '.'
+      : 'Đã thêm học viên mới.');
   }
 
   function saveDetail() {
@@ -4008,16 +5125,25 @@
     });
     found.stu.notes = notes;
     var bookEl = document.getElementById('d-book');
+    var bookEl2 = document.getElementById('d-book-2');
     var selfEl = document.getElementById('d-pec-self');
     var userEl = document.getElementById('d-pec-user');
     var passEl = document.getElementById('d-pec-pass');
-    if (bookEl && found.cls) {
-      writeCurriculum(found.stu, L.currentLevel(found.cls), {
-        bookStatus: bookEl.value,
+    if ((bookEl || bookEl2) && found.cls) {
+      var bookPatch = {
         pecMode: selfEl && selfEl.checked ? 'self' : '',
         pecUser: userEl ? userEl.value : '',
         pecPass: passEl ? passEl.value : ''
-      });
+      };
+      if (bookEl2) {
+        bookPatch.books = [
+          { status: bookEl ? bookEl.value : 'not-bought' },
+          { status: bookEl2.value }
+        ];
+      } else if (bookEl) {
+        bookPatch.bookStatus = bookEl.value;
+      }
+      writeCurriculum(found.stu, L.currentLevel(found.cls), bookPatch);
     }
     ui.detailEdit = false;
     save();
@@ -4039,15 +5165,65 @@
     if (deny(canEdit())) return;
     var target = document.getElementById('transfer-target');
     if (!target) return;
-    var result = L.transferStudents(state, ui.classId, target.value, selectedIds(), new Date());
+    var when = new Date();
+    var fromCls = findClass(ui.classId);
+    var toCls = findClass(target.value);
+    var ids = selectedIds().slice();
+    var moving = [];
+    ids.forEach(function (id) {
+      var found = findStudent(id);
+      if (found) moving.push({ name: found.stu.name, code: found.stu.code });
+    });
+    var result = L.transferStudents(state, ui.classId, target.value, ids, when);
     if (result.error) { showFormError(result.error); return; }
     if (ui.detailId && result.moved.indexOf(ui.detailId) >= 0) ui.detailId = null;
     ui.selected = {};
-    ui.modal = null;
     ui.formError = '';
+    ui.modal = { type: 'transfer-ask', text: L.transferReport(fromCls, toCls, moving, when) };
     logAction('chuyển ' + result.moved.length + ' học viên tới ' + result.toName);
     save();
     toast('Đã chuyển ' + result.moved.length + ' học viên tới ' + result.toName + '.' + (result.levelGap ? ' Bạn đang xếp chuyển lớp lệch trình độ.' : ''));
+    render();
+  }
+
+  function copyReport() {
+    var box = document.getElementById('report-text');
+    var text = box ? box.value : ((ui.modal && ui.modal.text) || '');
+    function done() { toast('Đã copy nội dung.'); }
+    function fallback() {
+      if (!box) { toast('Không copy được.'); return; }
+      box.focus();
+      box.select();
+      try {
+        if (document.execCommand('copy')) done();
+        else toast('Không copy được.');
+      } catch (err) { toast('Không copy được.'); }
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(fallback);
+      return;
+    }
+    fallback();
+  }
+
+  function openBookMessage() {
+    if (!canEdit()) return;
+    var cls = findClass(ui.curriculumId);
+    if (!cls) return;
+    var level = curriculumLevelOf(cls);
+    var grade = L.gradeById(level && (level.gradeId || cls.gradeId));
+    var books = L.curriculumBooks(grade);
+    var active = [];
+    var paused = [];
+    (cls.students || []).forEach(function (stu) {
+      if (isPausedStudent(stu)) paused.push(stu);
+      else active.push(stu);
+    });
+    var ordered = L.sortStudents(active, 'name').concat(L.sortStudents(paused, 'name'));
+    var picked = ordered.filter(function (stu) { return ui.bookPick[stu.id]; });
+    if (!picked.length) { toast('Chọn học viên trước.'); return; }
+    ui.formError = '';
+    ui.modal = { type: 'copy', text: L.feeReport(picked, books, new Date()) };
     render();
   }
 
@@ -4139,6 +5315,16 @@
     var saveBtn = document.querySelector('#settings-form [type="submit"]');
     if (saveBtn) saveBtn.hidden = !canEdit();
     document.getElementById('settingsbox').classList.remove('hidden');
+    if (!ui.skinFold) {
+      var nowSkin = skinOf(currentAccount());
+      SKIN_BOOK.forEach(function (group) {
+        group.items.forEach(function (item) {
+          if (item.id === nowSkin) ui.skinFold = group.id;
+        });
+      });
+    }
+    ui.skinPeek = skinOf(currentAccount());
+    paintSkinDesk();
     paintThemeButtons();
     paintAccounts();
     paintScript();
@@ -5034,6 +6220,17 @@
     toast('Đã xóa tài khoản.');
   }
 
+  document.addEventListener('mouseover', function (e) {
+    var skinBtn = e.target.closest ? e.target.closest('[data-skin-btn]') : null;
+    if (!skinBtn) return;
+    peekSkin(skinBtn.getAttribute('data-skin'));
+  });
+  document.addEventListener('focusin', function (e) {
+    var skinBtn = e.target.closest ? e.target.closest('[data-skin-btn]') : null;
+    if (!skinBtn) return;
+    peekSkin(skinBtn.getAttribute('data-skin'));
+  });
+
   document.addEventListener('click', function (e) {
     if (e.target.id === 'previewbox') { closePreview(); return; }
     if (e.target.id === 'clockbox') document.getElementById('clockbox').classList.add('hidden');
@@ -5054,7 +6251,9 @@
       'new-account': 1, 'edit-account': 1, 'delete-account': 1,
       'download-data': 1, 'download-classes': 1, 'pick-folder': 1,
       'drop-image': 1, 'open-soa': 1, 'soa-drop': 1,
-      'edit-staff': 1, 'save-staff': 1
+      'edit-staff': 1, 'save-staff': 1,
+      'dup-transfer': 1, 'dup-skip': 1,
+      'book-fold': 1, 'book-set': 1, 'book-message': 1, 'copy-report': 1, 'transfer-report-yes': 1
     };
     var studentActs = {
       'bulk-transfer': 1, 'confirm-transfer': 1, 'transfer-pick': 1,
@@ -5063,7 +6262,7 @@
     var classActs = { 'edit-class': 1, 'delete-class': 1, 'do-delete-class': 1 };
     var examActs = {
       'exam-create': 1, 'exam-next': 1, 'exam-back': 1, 'exam-cancel': 1, 'exam-commit': 1,
-      'exam-extra-pick': 1, 'exam-day': 1, 'exam-cal': 1
+      'exam-extra-pick': 1, 'exam-day': 1, 'exam-cal': 1, 'exam-edit': 1
     };
     if (adminOnly[act] && deny(canEdit())) return;
     if (studentActs[act] && deny(canEdit())) return;
@@ -5084,7 +6283,30 @@
     if (act === 'close-settings') { closeSettings(); return; }
     if (act === 'set-theme') { applyTheme(btn.getAttribute('data-theme')); return; }
     if (act === 'set-primary') { applyPrimary(btn.getAttribute('data-primary')); return; }
+    if (act === 'skin-fold') {
+      var groupId = btn.getAttribute('data-group');
+      ui.skinFold = ui.skinFold === groupId ? '' : groupId;
+      ui.skinPeek = skinOf(currentAccount());
+      paintSkinDesk();
+      return;
+    }
     if (act === 'set-skin') { applySkin(btn.getAttribute('data-skin')); return; }
+    if (act === 'class-layout' || act === 'curriculum-layout') {
+      var nextLayout = btn.getAttribute('data-layout') === 'list' ? 'list' : 'cards';
+      if (act === 'curriculum-layout') ui.curriculumLayout = nextLayout;
+      else ui.classLayout = nextLayout;
+      render();
+      return;
+    }
+    if (act === 'class-sort' || act === 'curriculum-sort') {
+      var nextSort = btn.getAttribute('data-sort') === 'number' ? 'number' : 'level';
+      if (act === 'curriculum-sort') ui.curriculumSort = nextSort;
+      else ui.classSort = nextSort;
+      render();
+      return;
+    }
+    if (act === 'dup-transfer') { acceptTwin(btn.getAttribute('data-id'), btn.getAttribute('data-from')); return; }
+    if (act === 'dup-skip') { skipTwin(); return; }
     if (act === 'gate-confirm') { confirmGate(btn.getAttribute('data-id')); return; }
     if (act === 'gate-confirm-old') { confirmOldGate(); return; }
     if (act === 'open-notices') {
@@ -5116,15 +6338,27 @@
       render();
       return;
     }
+    if (act === 'dict-pick') { dictLookup(btn.getAttribute('data-word')); return; }
+    if (act === 'dict-tab') {
+      ui.dict.tab = btn.getAttribute('data-tab') === 'audio' ? 'audio' : 'mean';
+      render();
+      return;
+    }
+    if (act === 'dict-copy-audio' || act === 'dict-copy-mp4') {
+      dictCopy(Number(btn.getAttribute('data-index')), act === 'dict-copy-mp4');
+      return;
+    }
     if (act === 'nav') {
       ui.screen = btn.getAttribute('data-screen');
       ui.modal = null;
       ui.detailId = null;
       ui.detailEdit = false;
       if (ui.screen === 'classes') ui.selected = {};
-      if (ui.screen === 'curriculum') {
+      if (ui.screen === 'curriculum' || ui.screen === 'menu') {
         ui.curriculumId = null;
         ui.curriculumLevel = '';
+        ui.bookPick = {};
+        ui.bookFold = '';
       }
       if (ui.screen === 'archive') {
         ui.archiveFolder = '';
@@ -5319,6 +6553,8 @@
     if (act === 'open-curriculum') {
       ui.curriculumId = btn.getAttribute('data-id');
       ui.curriculumLevel = '';
+      ui.bookPick = {};
+      ui.bookFold = '';
       ui.screen = 'curriculum';
       ui.modal = null;
       ui.detailId = null;
@@ -5329,6 +6565,8 @@
     if (act === 'curriculum-back') {
       ui.curriculumId = null;
       ui.curriculumLevel = '';
+      ui.bookPick = {};
+      ui.bookFold = '';
       ui.screen = 'curriculum';
       render();
       return;
@@ -5376,6 +6614,30 @@
       return;
     }
     if (act === 'confirm-transfer') { doTransfer(); return; }
+    if (act === 'transfer-report-yes') {
+      if (!ui.modal || ui.modal.type !== 'transfer-ask') return;
+      ui.modal = { type: 'copy', text: ui.modal.text || '' };
+      ui.formError = '';
+      render();
+      return;
+    }
+    if (act === 'copy-report') { copyReport(); return; }
+    if (act === 'book-fold') {
+      var foldKey = btn.getAttribute('data-id') + ':' + btn.getAttribute('data-slot');
+      ui.bookFold = ui.bookFold === foldKey ? '' : foldKey;
+      render();
+      return;
+    }
+    if (act === 'book-set') {
+      ui.bookFold = '';
+      applyCurriculumPatch(btn.getAttribute('data-id'), {
+        bookIndex: Number(btn.getAttribute('data-slot')),
+        bookStatus: btn.getAttribute('data-status')
+      }, true);
+      return;
+    }
+    if (act === 'book-message') { openBookMessage(); return; }
+    if (act === 'curriculum-cm') { ui.curriculumCmOpen = !ui.curriculumCmOpen; render(); return; }
     if (act === 'bulk-expire') {
       if (!selectedIds().length) return;
       ui.formError = '';
@@ -5502,10 +6764,18 @@
       return;
     }
     if (act === 'exam-cancel' || act === 'exam-list') {
+      var backExam = ui.examWizard && ui.examWizard.editId;
       ui.examWizard = null;
       if (act === 'exam-list') ui.examId = null;
+      else if (backExam) ui.examId = backExam;
       ui.formError = '';
       render();
+      return;
+    }
+    if (act === 'exam-edit') {
+      var editExam = findExam(ui.examId);
+      if (!editExam) return;
+      openExamEditor(editExam);
       return;
     }
     if (act === 'open-exam') {
@@ -5754,11 +7024,23 @@
     }
     if (t.id === 'curriculum-level') {
       ui.curriculumLevel = t.value;
+      ui.bookFold = '';
       render();
       return;
     }
-    if (t.id === 'd-book') {
+    if (t.id === 'curriculum-month') {
+      ui.curriculumMonth = t.value || L.monthKey(new Date());
+      render();
+      return;
+    }
+    if (t.id === 'd-book' || t.id === 'd-book-2') {
       t.className = 'book-pick ' + bookStatusClass(t.value);
+      return;
+    }
+    if (t.matches('[data-book-pick]')) {
+      var pickId = t.getAttribute('data-book-pick');
+      if (t.checked) ui.bookPick[pickId] = true;
+      else delete ui.bookPick[pickId];
       return;
     }
     if (t.id === 'd-pec-self') {
@@ -5812,13 +7094,33 @@
     if (e.target && e.target.id === 'acc-pass') e.target.setAttribute('data-typed', '1');
   });
 
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' || !e.target || e.target.id !== 'dict-q') return;
+    e.preventDefault();
+    dictLookup(e.target.value);
+  });
+
   document.addEventListener('input', function (e) {
     if (e.target.id === 'rejoin-q') {
       paintRejoin(e.target.value);
       return;
     }
-    if (e.target.id === 'class-q') {
+    if (e.target.id === 'dict-q') {
+      ui.dict.query = e.target.value;
+      clearTimeout(dictTimer);
+      var dictToken = ++dictSeq;
+      var dictText = e.target.value;
+      dictTimer = setTimeout(function () { dictSuggest(dictToken, dictText); }, 280);
+      return;
+    }
+    if (e.target.id === 'class-q' || e.target.id === 'curriculum-q') {
+      if (e.target.id === 'curriculum-q') ui.curriculumQuery = e.target.value;
+      else ui.classQuery = e.target.value;
       var classQuery = String(e.target.value || '').trim().toLowerCase();
+      document.querySelectorAll('.folder-item, .class-line').forEach(function (item) {
+        var className = item.getAttribute('data-name') || '';
+        item.hidden = !!(classQuery && className.indexOf(classQuery) < 0);
+      });
       document.querySelectorAll('.group-block').forEach(function (block) {
         var items = block.querySelectorAll('.folder-item');
         if (!items.length) {
@@ -5827,10 +7129,7 @@
         }
         var anyClass = false;
         items.forEach(function (item) {
-          var className = item.getAttribute('data-name') || '';
-          var showClass = !classQuery || className.indexOf(classQuery) >= 0;
-          item.hidden = !showClass;
-          if (showClass) anyClass = true;
+          if (!item.hidden) anyClass = true;
         });
         block.hidden = !anyClass;
       });
@@ -6041,9 +7340,9 @@
     }, true);
   }
 
-  function finishBoot() {
-    applyTheme(state.settings.theme);
-    savePaused = false;
+  function enterBook() {
+    if (bookEntered) return;
+    bookEntered = true;
     var loader = document.getElementById('loader');
     try {
       var savedUser = JSON.parse(sessionStorage.getItem('oceanEduUser') || 'null');
@@ -6066,6 +7365,12 @@
     if (persistBook) save({ keepStamp: true, quiet: true });
     if (loader) loader.classList.add('hidden');
     render();
+  }
+
+  function finishBoot() {
+    applyTheme(state.settings.theme);
+    savePaused = false;
+    enterBook();
   }
 
   function frameLabel(frame) {
@@ -6118,6 +7423,7 @@
   paintLoaderRatio();
   window.addEventListener('resize', function () {
     fitViewport();
+    pinBars();
     var loader = document.getElementById('loader');
     if (loader && !loader.classList.contains('hidden')) paintLoaderRatio();
   });
