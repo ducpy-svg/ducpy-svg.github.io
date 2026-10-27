@@ -2,7 +2,7 @@
   'use strict';
 
   var L = window.OceanLogic;
-  var APP_TITLE = 'Ocean EDU - Student management list (Unofficial) ver 1.4.6';
+  var APP_TITLE = 'Ocean EDU - Student management list (Unofficial) ver 1.4.7';
   var SUGGEST_URL = 'https://script.google.com/macros/s/AKfycbyNFHdMszhrmqyfXDHSDi2ti51y5_Ib3kiXgA5cGzcPkWLboUJSnPYJ5xwikb9N-fLOkg/exec';
   var PRIMARY_IDS = ['ocean', 'sky', 'teal', 'green', 'lime', 'amber', 'orange', 'coral', 'rose', 'violet', 'indigo', 'slate'];
   var SKIN_BOOK = [
@@ -70,6 +70,7 @@
     archive: [],
     exams: [],
     staffBook: {},
+    personnel: [],
     soaSlots: [],
     tasks: [],
     activity: []
@@ -128,19 +129,33 @@
     classLayout: 'cards',
     classSort: 'level',
     classQuery: '',
-    dict: { query: '', status: '', message: '', tab: 'mean', entry: null, suggestions: [] }
+    dict: { query: '', status: '', message: '', tab: 'mean', entry: null, suggestions: [] },
+    peopleLayout: 'table',
+    peopleQuery: '',
+    peopleKey: ''
   };
 
   var droppedArchive = [];
   var archivePurgePersist = false;
   var examsSeen = false;
   var staffBookSeen = false;
+  var personnelSeen = false;
   var soaSeen = false;
   var tasksSeen = false;
   var activitySeen = false;
   var toastQueue = [];
   var toastPlaying = false;
   var SOA_TYPES = ['Interview', 'event', 'Lớp EB'];
+  var POSITIONS = [
+    { id: 'CM', name: 'Class Manager' },
+    { id: 'EC', name: 'Educational Consultant' },
+    { id: 'FET', name: 'Foreign English Teacher' },
+    { id: 'BM', name: 'Branch Manager' },
+    { id: 'BAM', name: 'Branch Administrative Manager' },
+    { id: 'FBM', name: 'Floating Branch Manager' },
+    { id: 'TTL', name: 'Training Team Leader' },
+    { id: 'ATL', name: 'Administrative Team Leader' }
+  ];
 
   var loading = false;
   var toastTimer = null;
@@ -225,7 +240,8 @@
         'Ocean EDU - Student management list (Unofficial) ver 1.4.3',
         'Ocean EDU - Student management list (Unofficial) ver 1.4.4',
         'Ocean EDU - Student management list (Unofficial) ver 1.4.5 demo',
-        'Ocean EDU - Student management list (Unofficial) ver 1.4.5v2'
+        'Ocean EDU - Student management list (Unofficial) ver 1.4.5v2',
+        'Ocean EDU - Student management list (Unofficial) ver 1.4.6'
       ];
       if (!state.settings.title || legacyTitle.indexOf(state.settings.title) >= 0) state.settings.title = APP_TITLE;
       delete state.settings.supabaseUrl;
@@ -263,6 +279,8 @@
       examsSeen = Array.isArray(raw.exams);
       state.staffBook = normalizeStaffBook(raw.staffBook);
       staffBookSeen = !!(raw.staffBook && typeof raw.staffBook === 'object' && !Array.isArray(raw.staffBook));
+      state.personnel = normalizePersonnel(raw.personnel);
+      personnelSeen = Array.isArray(raw.personnel);
       state.soaSlots = normalizeSoa(raw.soaSlots);
       soaSeen = Array.isArray(raw.soaSlots);
       state.tasks = [];
@@ -277,12 +295,14 @@
       state.archive = [];
       state.exams = [];
       state.staffBook = {};
+      state.personnel = [];
       state.soaSlots = [];
       state.tasks = [];
       state.activity = [];
       droppedArchive = [];
       examsSeen = false;
       staffBookSeen = false;
+      personnelSeen = false;
       soaSeen = false;
       tasksSeen = false;
       activitySeen = false;
@@ -457,6 +477,7 @@
   var shareArchive = false;
   var shareExams = false;
   var shareStaff = false;
+  var sharePersonnel = false;
   var shareSoa = false;
   var shareTasks = false;
   var shareActivity = false;
@@ -484,6 +505,10 @@
       state.staffBook = L.mergeStaffRows(state.staffBook || {}, file.staffBook, newer);
       shareStaff = true;
     }
+    if (Array.isArray(file.personnel)) {
+      state.personnel = normalizePersonnel(L.mergeById(state.personnel || [], file.personnel, newer));
+      sharePersonnel = true;
+    }
     if (Array.isArray(file.soaSlots)) {
       state.soaSlots = L.mergeById(state.soaSlots || [], file.soaSlots, newer);
       shareSoa = true;
@@ -502,6 +527,10 @@
     if (shareStaff) {
       state.staffBook = normalizeStaffBook(state.staffBook);
       if (staffBookHasData()) staffBookSeen = true;
+    }
+    if (sharePersonnel) {
+      state.personnel = normalizePersonnel(state.personnel);
+      if (state.personnel.length) personnelSeen = true;
     }
     if (shareSoa) {
       state.soaSlots = normalizeSoa(state.soaSlots);
@@ -744,6 +773,7 @@
     };
     if (examsSeen || (state.exams && state.exams.length)) payload.exams = state.exams || [];
     if (staffBookSeen || staffBookHasData()) payload.staffBook = state.staffBook || {};
+    if (personnelSeen || (state.personnel && state.personnel.length)) payload.personnel = state.personnel || [];
     if (soaSeen || (state.soaSlots && state.soaSlots.length)) payload.soaSlots = state.soaSlots || [];
     return payload;
   }
@@ -1783,7 +1813,7 @@
   function viewMenu() {
     var stats = currentWeekStats(null);
     return shell(summaryHtml(stats) + dashboardHtml() +
-      '<details class="menu-fold"><summary>Menu chính A–I</summary><section class="menu-grid">' +
+      '<details class="menu-fold"><summary>Menu chính A–J</summary><section class="menu-grid">' +
       '<button type="button" class="menu-card" data-act="nav" data-screen="classes">' + iconClass() +
       '<div class="kicker">A · CLASS INFOS</div><h2>Quản lý lớp</h2>' +
       '<p>Lớp, học viên, sĩ số. Nút xem chuyên cần nằm trên từng thẻ.</p></button>' +
@@ -1812,7 +1842,10 @@
       '<button type="button" class="menu-card" data-act="nav" data-screen="dictionary">' + iconDict() +
       '<span class="comic-meta">Bản meta thử nghiệm</span>' +
       '<div class="kicker">I · DICTIONARY</div><h2>Dictionary</h2>' +
-      '<p>Tra từ Anh–Việt, ví dụ, từ đồng nghĩa và nghe phát âm.</p></button></section></details>');
+      '<p>Tra từ Anh–Việt, ví dụ, từ đồng nghĩa và nghe phát âm.</p></button>' +
+      '<button type="button" class="menu-card" data-act="nav" data-screen="personnel">' + iconPeople() +
+      '<div class="kicker">J · PERSONNEL</div><h2>Quản lý nhân sự</h2>' +
+      '<p>Tên, mã, chức vụ, ngày sinh và giới tính.</p></button></section></details>');
   }
 
   function iconDict() {
@@ -1839,6 +1872,17 @@
       '<rect fill="#fff6d8" x="4" y="3" width="8" height="10"/>' +
       '<rect fill="#15803d" x="5" y="5" width="6" height="2"/>' +
       '<rect fill="#15803d" x="5" y="9" width="4" height="2"/>' +
+      '</svg>';
+  }
+
+  function iconPeople() {
+    return '<svg class="pixel-icon" viewBox="0 0 16 16" aria-hidden="true" shape-rendering="crispEdges">' +
+      '<rect fill="#e2b007" x="2" y="2" width="3" height="3"/>' +
+      '<rect fill="#0c4a72" x="1" y="6" width="5" height="4"/>' +
+      '<rect fill="#15803d" x="6" y="1" width="4" height="4"/>' +
+      '<rect fill="#0c4a72" x="5" y="6" width="6" height="5"/>' +
+      '<rect fill="#e11d2e" x="11" y="3" width="3" height="3"/>' +
+      '<rect fill="#0c4a72" x="10" y="7" width="5" height="4"/>' +
       '</svg>';
   }
 
@@ -2863,6 +2907,7 @@
       (canExportClasses() ? '<button type="button" class="btn" data-act="export-classes" data-kind="xlsx">Excel</button>' +
         '<button type="button" class="btn" data-act="export-classes" data-kind="pdf">PDF</button>' +
         '<button type="button" class="btn" data-act="export-classes" data-kind="img">Ảnh</button>' +
+        '<button type="button" class="btn" data-act="export-classes" data-kind="jpg">JPG</button>' +
         '<button type="button" class="btn" data-act="export-classes" data-kind="print">Print (in)</button>' : '') +
       (canEdit() ? '<button type="button" class="btn btn-primary" data-act="open-add-class">+ Thêm lớp</button>' : '') +
       '</div></div>' +
@@ -3123,6 +3168,7 @@
       ? '<div class="btn-row"><button type="button" class="btn" data-act="export-schedule" data-kind="xlsx">Excel</button>' +
         '<button type="button" class="btn" data-act="export-schedule" data-kind="pdf">PDF</button>' +
         '<button type="button" class="btn" data-act="export-schedule" data-kind="img">Ảnh</button>' +
+        '<button type="button" class="btn" data-act="export-schedule" data-kind="jpg">JPG</button>' +
         '<button type="button" class="btn" data-act="export-schedule" data-kind="print">Print (in)</button></div>'
       : '';
     var soaBtn = canEdit() ? '<button type="button" class="btn" data-act="open-soa">Thêm giờ SOA</button>' : '';
@@ -3283,6 +3329,7 @@
         (pick ? '<button type="button" class="btn" data-act="export-homework" data-kind="xlsx">Excel</button>' +
         '<button type="button" class="btn" data-act="export-homework" data-kind="pdf">PDF</button>' +
         '<button type="button" class="btn" data-act="export-homework" data-kind="img">Ảnh</button>' +
+        '<button type="button" class="btn" data-act="export-homework" data-kind="jpg">JPG</button>' +
         '<button type="button" class="btn" data-act="export-homework" data-kind="print">Print (in)</button>' : '') +
         '</div>' +
         '<p class="help">Cập nhật Excel ghi dấu từ hàng 2 theo ngày của lớp, kể cả tháng đã qua. Cột lệch ngày dán vào buổi gần nhất chưa có dữ liệu.</p>' +
@@ -4098,6 +4145,7 @@
     if (ui.modal.type === 'move-session') return moveForm();
     if (ui.modal.type === 'suggest') return suggestForm();
     if (ui.modal.type === 'edit-staff') return staffForm();
+    if (ui.modal.type === 'people-form') return peopleForm();
     if (ui.modal.type === 'dup-student') return dupStudentForm();
     return '';
   }
@@ -4159,6 +4207,233 @@
     var moved = L.settleRoster(state, new Date());
     if (moved && moved.length) save({ quiet: true });
     return moved || [];
+  }
+
+  function normalizePersonnel(list) {
+    var allowed = {};
+    POSITIONS.forEach(function (item) { allowed[item.id] = true; });
+    return (Array.isArray(list) ? list : []).filter(function (row) {
+      return row && typeof row === 'object' && String(row.name || '').trim();
+    }).map(function (row) {
+      var position = String(row.position || '').toUpperCase();
+      var gender = String(row.gender || '');
+      if (gender !== 'Nam' && gender !== 'Nữ' && gender !== 'Khác') gender = '';
+      var dob = String(row.dob || '');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dob)) dob = '';
+      return {
+        id: row.id || L.uid(),
+        name: String(row.name).replace(/\s+/g, ' ').trim(),
+        code: String(row.code || '').trim(),
+        position: allowed[position] ? position : '',
+        dob: dob,
+        gender: gender
+      };
+    });
+  }
+
+  function personKey(name) {
+    return String(name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  }
+
+  function positionText(id) {
+    var key = String(id || '').toUpperCase();
+    for (var i = 0; i < POSITIONS.length; i++) {
+      if (POSITIONS[i].id === key) return POSITIONS[i].id + ' · ' + POSITIONS[i].name;
+    }
+    return '—';
+  }
+
+  function peopleRoster() {
+    var map = {};
+    function slot(name) {
+      var text = String(name || '').replace(/\s+/g, ' ').trim();
+      var key = personKey(text);
+      if (!key || key === '?' || key === '-') return null;
+      if (!map[key]) {
+        map[key] = { key: key, id: '', name: text, code: '', position: '', dob: '', gender: '', saved: false, inferred: '' };
+      }
+      return map[key];
+    }
+    (state.personnel || []).forEach(function (row) {
+      var item = slot(row.name);
+      if (!item) return;
+      item.id = row.id || '';
+      item.name = row.name;
+      item.code = row.code || '';
+      item.position = row.position || '';
+      item.dob = row.dob || '';
+      item.gender = row.gender || '';
+      item.saved = true;
+    });
+    Object.keys(state.staffBook || {}).forEach(function (name) {
+      var item = slot(name);
+      if (!item) return;
+      var code = String((state.staffBook[name] || {}).code || '').trim();
+      if (!item.code && code) item.code = code;
+      if (!item.saved && !item.inferred) item.inferred = 'FET';
+    });
+    (L.FET || []).forEach(function (name) {
+      var item = slot(name);
+      if (item && !item.saved && !item.inferred) item.inferred = 'FET';
+    });
+    (state.classes || []).forEach(function (cls) {
+      String(cls && cls.fet || '').split(',').forEach(function (part) {
+        var item = slot(part);
+        if (item && !item.saved && !item.inferred) item.inferred = 'FET';
+      });
+      String(cls && cls.cm || '').split(',').forEach(function (part) {
+        var item = slot(part);
+        if (item && !item.saved && !item.inferred) item.inferred = 'CM';
+      });
+      String(cls && cls.ta || '').split(',').forEach(function (part) { slot(part); });
+    });
+    (state.accounts || []).forEach(function (acc) {
+      var item = slot(acc && acc.name);
+      if (!item) return;
+      if (!item.code && acc.username) item.code = String(acc.username);
+    });
+    return Object.keys(map).map(function (key) {
+      var row = map[key];
+      if (!row.saved && row.inferred) row.position = row.inferred;
+      return row;
+    }).sort(function (a, b) { return a.name.localeCompare(b.name, 'vi'); });
+  }
+
+  function personByKey(key) {
+    var rows = peopleRoster();
+    for (var i = 0; i < rows.length; i++) if (rows[i].key === key) return rows[i];
+    return null;
+  }
+
+  function peopleForm() {
+    var row = ui.modal && ui.modal.key ? personByKey(ui.modal.key) : null;
+    var position = row ? row.position : '';
+    var options = '<option value="">Chưa chọn</option>' + POSITIONS.map(function (item) {
+      var label = item.id + ' · ' + item.name;
+      return '<option value="' + item.id + '"' + (position === item.id ? ' selected' : '') + '>' + esc(label) + '</option>';
+    }).join('');
+    var gender = row ? row.gender : '';
+    var genders = [{ value: '', label: '—' }, { value: 'Nam', label: 'Nam' }, { value: 'Nữ', label: 'Nữ' }, { value: 'Khác', label: 'Khác' }];
+    var gopts = genders.map(function (item) {
+      return '<option value="' + esc(item.value) + '"' + (gender === item.value ? ' selected' : '') + '>' + esc(item.label) + '</option>';
+    }).join('');
+    return modalShell(row ? 'Sửa nhân sự' : 'Thêm nhân sự',
+      '<label class="field"><span>Tên nhân sự</span><input id="people-name" value="' + esc(row ? row.name : '') + '" autocomplete="off"></label>' +
+      '<label class="field"><span>Mã nhân sự</span><input id="people-code" value="' + esc(row ? row.code : '') + '" autocomplete="off"></label>' +
+      '<label class="field"><span>Chức vụ</span><select id="people-position">' + options + '</select></label>' +
+      '<label class="field"><span>Ngày sinh</span><input id="people-dob" type="date" value="' + esc(row && row.dob ? row.dob : '') + '"></label>' +
+      '<label class="field"><span>Giới tính</span><select id="people-gender">' + gopts + '</select></label>' +
+      '<p class="help">Admin chọn chức vụ. Ngày sinh hiện trên danh sách theo dd/mm/yyyy.</p>',
+      '<button type="button" class="btn btn-primary" data-act="people-save">Lưu</button><button type="button" class="btn" data-act="close-modal">Hủy</button>');
+  }
+
+  function savePerson() {
+    if (deny(canEdit()) || !ui.modal || ui.modal.type !== 'people-form') return;
+    var nameEl = document.getElementById('people-name');
+    var codeEl = document.getElementById('people-code');
+    var posEl = document.getElementById('people-position');
+    var dobEl = document.getElementById('people-dob');
+    var genderEl = document.getElementById('people-gender');
+    var name = String(nameEl && nameEl.value || '').replace(/\s+/g, ' ').trim();
+    if (!name || name === '?' || name === '-') {
+      ui.formError = 'Cần tên nhân sự.';
+      render();
+      return;
+    }
+    var position = String(posEl && posEl.value || '').toUpperCase();
+    var known = false;
+    POSITIONS.forEach(function (item) { if (item.id === position) known = true; });
+    if (position && !known) return;
+    var gender = String(genderEl && genderEl.value || '');
+    if (gender !== 'Nam' && gender !== 'Nữ' && gender !== 'Khác') gender = '';
+    var dob = String(dobEl && dobEl.value || '');
+    if (dob && !/^\d{4}-\d{2}-\d{2}$/.test(dob)) dob = '';
+    var key = personKey(name);
+    var prevKey = ui.modal.key || '';
+    var keptId = '';
+    (state.personnel || []).forEach(function (item) {
+      var itemKey = personKey(item.name);
+      if (!keptId && (itemKey === key || (prevKey && itemKey === prevKey))) keptId = item.id || '';
+    });
+    var next = (state.personnel || []).filter(function (item) {
+      var itemKey = personKey(item.name);
+      return itemKey !== key && itemKey !== prevKey;
+    });
+    next.push({
+      id: keptId || L.uid(),
+      name: name,
+      code: String(codeEl && codeEl.value || '').trim(),
+      position: position,
+      dob: dob,
+      gender: gender
+    });
+    state.personnel = normalizePersonnel(next);
+    personnelSeen = true;
+    ui.modal = null;
+    ui.peopleKey = key;
+    ui.formError = '';
+    save();
+    toast('Đã lưu nhân sự.');
+    render();
+  }
+
+  function viewPerson(row) {
+    var edit = canEdit()
+      ? '<button type="button" class="btn btn-primary" data-act="people-edit" data-key="' + esc(row.key) + '">Sửa</button>'
+      : '';
+    return shell('<div class="section-head"><div><span class="nav-pair"><button type="button" class="btn" data-act="people-back">← Danh sách</button>' + homeButton() + '</span>' +
+      '<h2>' + esc(row.name) + '</h2><p class="meta">Mục J · Chi tiết nhân sự</p></div>' + edit + '</div>' +
+      '<article class="people-detail">' +
+      '<p><b>Tên nhân sự:</b> ' + esc(row.name) + '</p>' +
+      '<p><b>Mã nhân sự:</b> ' + esc(showText(row.code)) + '</p>' +
+      '<p><b>Chức vụ:</b> ' + esc(positionText(row.position)) + '</p>' +
+      '<p><b>Ngày sinh:</b> ' + esc(showDob(row.dob)) + '</p>' +
+      '<p><b>Giới tính:</b> ' + esc(showText(row.gender)) + '</p></article>' +
+      (canEdit() ? '' : '<p class="help">Tài khoản này chỉ xem nhân sự.</p>') +
+      modalHtml());
+  }
+
+  function viewPeople() {
+    var openKey = ui.peopleKey || '';
+    if (openKey) {
+      var one = personByKey(openKey);
+      if (one) return viewPerson(one);
+      ui.peopleKey = '';
+    }
+    var layout = ui.peopleLayout === 'list' ? 'list' : 'table';
+    var query = String(ui.peopleQuery || '').trim().toLowerCase();
+    var rows = peopleRoster();
+    function findText(row) {
+      return (row.name + ' ' + row.code + ' ' + positionText(row.position) + ' ' + (row.gender || '')).toLowerCase();
+    }
+    var table = '<div class="table-wrap"><table class="people-table"><thead><tr>' +
+      '<th>Tên nhân sự</th><th>Mã nhân sự</th><th>Chức vụ</th><th>Ngày sinh</th><th>Giới tính</th><th></th>' +
+      '</tr></thead><tbody>' + rows.map(function (row) {
+        var blob = findText(row);
+        var hide = query && blob.indexOf(query) < 0 ? ' hidden' : '';
+        return '<tr data-person data-find="' + esc(blob) + '"' + hide + '><td>' + esc(row.name) + '</td><td>' +
+          esc(showText(row.code)) + '</td><td>' + esc(positionText(row.position)) + '</td><td>' + esc(showDob(row.dob)) +
+          '</td><td>' + esc(showText(row.gender)) + '</td><td><button type="button" class="btn" data-act="people-open" data-key="' +
+          esc(row.key) + '">Chi tiết</button></td></tr>';
+      }).join('') + '</tbody></table></div>';
+    var list = '<div class="people-list">' + rows.map(function (row) {
+      var blob = findText(row);
+      var hide = query && blob.indexOf(query) < 0 ? ' hidden' : '';
+      return '<article class="people-line" data-person data-find="' + esc(blob) + '"' + hide + '><p><b>' + esc(row.name) +
+        '</b><span class="meta">' + esc(positionText(row.position)) + ' · ' + esc(showText(row.code)) + '</span></p>' +
+        '<button type="button" class="btn" data-act="people-open" data-key="' + esc(row.key) + '">Chi tiết</button></article>';
+    }).join('') + '</div>';
+    return shell('<div class="section-head"><div><span class="nav-pair"><button type="button" class="btn" data-act="nav" data-screen="menu">← Menu</button>' + homeButton() + '</span>' +
+      '<h2>Quản lý nhân sự</h2><p class="meta">Mục J</p></div>' +
+      (canEdit() ? '<button type="button" class="btn btn-primary" data-act="people-add">+ Thêm nhân sự</button>' : '') +
+      '</div><div class="btn-row">' +
+      '<button type="button" class="btn' + (layout !== 'list' ? ' btn-primary' : '') + '" data-act="people-layout" data-layout="table">Dạng bảng</button>' +
+      '<button type="button" class="btn' + (layout === 'list' ? ' btn-primary' : '') + '" data-act="people-layout" data-layout="list">Dạng danh sách</button></div>' +
+      '<label class="field class-q"><span>Tìm nhân sự</span><input id="people-q" placeholder="Tên, mã hoặc chức vụ" autocomplete="off" value="' + esc(ui.peopleQuery || '') + '"></label>' +
+      '<p class="help">Danh sách gồm tài khoản nhân sự và người đang là CM, FET hoặc TA trên lớp. Bấm Chi tiết để xem tên, mã, chức vụ, ngày sinh và giới tính. Admin sửa các mục này. CM là Class Manager, EC là Educational Consultant, FET là Foreign English Teacher, BM là Branch Manager, BAM là Branch Administrative Manager, FBM là Floating Branch Manager, TTL là Training Team Leader, ATL là Administrative Team Leader.</p>' +
+      (rows.length ? (layout === 'list' ? list : table) : '<p class="muted">Chưa có nhân sự.</p>') +
+      (canEdit() ? '' : '<p class="help">Tài khoản này chỉ xem nhân sự.</p>') +
+      modalHtml());
   }
 
   function staffMonthKey() {
@@ -4662,6 +4937,7 @@
       else if (ui.screen === 'exam') html = viewExam();
       else if (ui.screen === 'staff') html = viewStaff();
       else if (ui.screen === 'dictionary') html = viewDictionary();
+      else if (ui.screen === 'personnel') html = viewPeople();
       else html = viewMenu();
       root.innerHTML = html;
     } catch (err) {
@@ -5504,12 +5780,87 @@
     setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
   }
 
+  function cssHex(value, fallback) {
+    var text = String(value || '').trim();
+    var hex = text.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+    if (hex) {
+      var h = hex[1];
+      if (h.length === 3) h = h.charAt(0) + h.charAt(0) + h.charAt(1) + h.charAt(1) + h.charAt(2) + h.charAt(2);
+      return '#' + h.toLowerCase();
+    }
+    var rgb = text.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+    if (!rgb) return fallback;
+    function pair(n) {
+      var s = Number(n).toString(16);
+      return s.length < 2 ? '0' + s : s;
+    }
+    return '#' + pair(rgb[1]) + pair(rgb[2]) + pair(rgb[3]);
+  }
+
+  function colorLum(hex) {
+    var h = String(hex || '').replace('#', '');
+    if (h.length !== 6) return 0;
+    function chan(i) { return parseInt(h.slice(i, i + 2), 16) / 255; }
+    return 0.2126 * chan(0) + 0.7152 * chan(2) + 0.0722 * chan(4);
+  }
+
+  function exportTheme() {
+    var cs = getComputedStyle(document.documentElement);
+    function pick(name, fallback) { return cssHex(cs.getPropertyValue(name), fallback); }
+    var paper = pick('--paper', '#f7fbff');
+    var paper2 = pick('--paper2', '#e5f4ff');
+    var ink = pick('--ink', '#12324a');
+    var sea = pick('--sea-deep', '#0c4a72');
+    var line = pick('--line', sea);
+    var muted = pick('--muted', ink);
+    var chip = pick('--chip', '#ffffff');
+    var onAccent = pick('--on-accent', '#ffffff');
+    var bandInk = colorLum(sea) > 0.62 ? ink : onAccent;
+    if (colorLum(sea) > 0.62 && Math.abs(colorLum(bandInk) - colorLum(sea)) < 0.25) bandInk = '#12324a';
+    var headInk = colorLum(paper2) > 0.55 ? (colorLum(sea) < 0.75 ? sea : ink) : onAccent;
+    if (Math.abs(colorLum(headInk) - colorLum(paper2)) < 0.25) headInk = ink;
+    var body = getComputedStyle(document.body);
+    var sample = document.querySelector('#app h2') || document.body;
+    var headFont = getComputedStyle(sample).fontFamily || body.fontFamily;
+    return {
+      paper: paper,
+      paper2: paper2,
+      ink: ink,
+      sea: sea,
+      line: line,
+      muted: muted,
+      chip: chip,
+      bandInk: bandInk,
+      headInk: headInk,
+      font: body.fontFamily || '"Segoe UI", sans-serif',
+      headFont: headFont || body.fontFamily || '"Segoe UI", sans-serif'
+    };
+  }
+
+  function applyPrintTheme(theme) {
+    var root = document.documentElement;
+    root.style.setProperty('--print-paper', theme.paper);
+    root.style.setProperty('--print-ink', theme.ink);
+    root.style.setProperty('--print-muted', theme.muted);
+    root.style.setProperty('--print-font', theme.font);
+    root.style.setProperty('--print-head-font', theme.headFont);
+    root.style.setProperty('--print-head', theme.paper2);
+    root.style.setProperty('--print-head-ink', theme.headInk);
+    root.style.setProperty('--print-line', theme.line);
+    root.style.setProperty('--print-band', theme.sea);
+    root.style.setProperty('--print-band-ink', theme.bandInk);
+    root.style.setProperty('--print-gap', theme.paper2);
+    root.style.setProperty('--print-chip', theme.chip);
+  }
+
   function drawSheet(spec) {
+    var theme = spec.theme || exportTheme();
     var scale = 2;
     var padX = 8;
     var lineH = 16;
-    var font = '14px "Segoe UI", sans-serif';
-    var bold = '700 14px "Segoe UI", sans-serif';
+    var font = '14px ' + theme.font;
+    var bold = '700 14px ' + theme.font;
+    var titleFont = '700 22px ' + theme.headFont;
     var measure = document.createElement('canvas').getContext('2d');
     measure.font = font;
     var cols = spec.headers.length;
@@ -5546,70 +5897,104 @@
     canvas.height = Math.floor(height * scale);
     var g = canvas.getContext('2d');
     g.scale(scale, scale);
-    g.fillStyle = '#f4fbff';
+    g.fillStyle = theme.paper;
     g.fillRect(0, 0, width, height);
-    g.fillStyle = '#0c4a72';
-    g.font = '700 22px "Segoe UI", sans-serif';
+    g.fillStyle = theme.sea;
+    g.fillRect(0, 0, 10, height);
+    g.fillStyle = theme.headInk;
+    g.font = titleFont;
+    g.textAlign = 'left';
+    g.textBaseline = 'alphabetic';
     g.fillText(spec.title, 24, 30);
     g.font = font;
-    g.fillStyle = '#12324a';
+    g.fillStyle = theme.muted;
     meta.forEach(function (line, index) { g.fillText(line, 24, 56 + index * 20); });
     var x0 = 24;
     var y = top;
+    var cuts = [];
     function box(x, yPos, w, h, fill) {
       g.fillStyle = fill;
       g.fillRect(x, yPos, w, h);
-      g.strokeStyle = '#0c4a72';
+      g.strokeStyle = theme.line;
       g.lineWidth = 1;
       g.strokeRect(x + 0.5, yPos + 0.5, w - 1, h - 1);
     }
+    function paintLines(text, x, yPos, w, h, color, face) {
+      g.save();
+      g.beginPath();
+      g.rect(x + 1, yPos + 1, Math.max(1, w - 2), Math.max(1, h - 2));
+      g.clip();
+      g.fillStyle = color;
+      g.font = face;
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      var lines = String(text || '').split('\n');
+      var block = lines.length * lineH;
+      var startY = yPos + (h - block) / 2 + lineH / 2;
+      lines.forEach(function (line, lineIndex) {
+        g.fillText(line, x + w / 2, startY + lineIndex * lineH);
+      });
+      g.restore();
+    }
     var x = x0;
     spec.headers.forEach(function (header, index) {
-      box(x, y, widths[index], headerH, '#d7eefc');
-      g.fillStyle = '#0c4a72';
-      g.font = bold;
-      g.fillText(String(header), x + padX, y + 22);
+      box(x, y, widths[index], headerH, theme.paper2);
+      paintLines(header, x, y, widths[index], headerH, theme.headInk, bold);
       x += widths[index];
     });
     y += headerH;
+    cuts.push(Math.round(y * scale));
     spec.rows.forEach(function (row, index) {
       var h = heights[index];
       if (row.kind === 'band' || row.kind === 'gap') {
-        box(x0, y, tableW, h, row.kind === 'band' ? '#0c4a72' : '#e7f3fb');
-        g.fillStyle = row.kind === 'band' ? '#f5fbff' : '#12324a';
-        g.font = bold;
-        g.fillText(String((row.cells && row.cells[0]) || ''), x0 + padX, y + 18);
+        var band = row.kind === 'band';
+        box(x0, y, tableW, h, band ? theme.sea : theme.paper2);
+        paintLines((row.cells && row.cells[0]) || '', x0, y, tableW, h, band ? theme.bandInk : theme.ink, bold);
         y += h;
+        cuts.push(Math.round(y * scale));
         return;
       }
       var cx = x0;
       for (var i = 0; i < cols; i++) {
-        box(cx, y, widths[i], h, (row.fills && row.fills[i]) || '#ffffff');
-        g.fillStyle = (row.ink && row.ink[i]) || '#12324a';
-        g.font = font;
-        String((row.cells && row.cells[i]) || '').split('\n').forEach(function (line, lineIndex) {
-          g.fillText(line, cx + padX, y + 16 + lineIndex * lineH);
-        });
+        box(cx, y, widths[i], h, (row.fills && row.fills[i]) || theme.chip);
+        paintLines((row.cells && row.cells[i]) || '', cx, y, widths[i], h, (row.ink && row.ink[i]) || theme.ink, font);
         cx += widths[i];
       }
       y += h;
+      cuts.push(Math.round(y * scale));
     });
+    g.textAlign = 'left';
+    g.textBaseline = 'alphabetic';
+    canvas._cuts = cuts;
     return canvas;
   }
 
-  function sliceCanvas(src) {
+  function sliceCanvas(src, theme) {
+    var paper = theme && theme.paper ? theme.paper : '#f7fbff';
     var sliceH = Math.max(1, Math.floor(src.width * 595.28 / 841.89));
+    var cuts = src._cuts && src._cuts.length ? src._cuts.slice() : [];
+    if (!cuts.length || cuts[cuts.length - 1] !== src.height) cuts.push(src.height);
     var pages = [];
-    for (var y = 0; y < src.height; y += sliceH) {
-      var h = Math.min(sliceH, src.height - y);
+    var start = 0;
+    while (start < src.height) {
+      var end = Math.min(src.height, start + sliceH);
+      if (end < src.height) {
+        var best = start;
+        for (var i = 0; i < cuts.length; i++) {
+          if (cuts[i] > start && cuts[i] <= end) best = cuts[i];
+        }
+        if (best > start) end = best;
+      }
+      var h = Math.max(1, end - start);
       var piece = document.createElement('canvas');
       piece.width = src.width;
       piece.height = h;
       var ctx = piece.getContext('2d');
-      ctx.fillStyle = '#f4fbff';
+      ctx.fillStyle = paper;
       ctx.fillRect(0, 0, piece.width, piece.height);
-      ctx.drawImage(src, 0, y, src.width, h, 0, 0, src.width, h);
+      ctx.drawImage(src, 0, start, src.width, h, 0, 0, src.width, h);
       pages.push(piece);
+      start = end;
     }
     return pages;
   }
@@ -5679,6 +6064,8 @@
   function printSpec(spec) {
     var root = document.getElementById('print-root');
     if (!root) return;
+    var theme = spec.theme || exportTheme();
+    applyPrintTheme(theme);
     var cols = (spec.headers || []).length || 1;
     function cellHtml(value) {
       return esc(value).replace(/\n/g, '<br>');
@@ -5692,7 +6079,12 @@
       }
       var cells = row.cells || [];
       var tds = [];
-      for (var i = 0; i < cols; i++) tds.push('<td>' + cellHtml(cells[i] == null ? '' : cells[i]) + '</td>');
+      for (var i = 0; i < cols; i++) {
+        var style = '';
+        if (row.fills && row.fills[i]) style += 'background:' + row.fills[i] + ';';
+        if (row.ink && row.ink[i]) style += 'color:' + row.ink[i] + ';';
+        tds.push('<td' + (style ? ' style="' + style + '"' : '') + '>' + cellHtml(cells[i] == null ? '' : cells[i]) + '</td>');
+      }
       return '<tr>' + tds.join('') + '</tr>';
     }).join('');
     var meta = (spec.meta || []).map(function (line) {
@@ -5711,11 +6103,13 @@
   }
 
   function exportSheet(spec, kind, name) {
+    spec.theme = exportTheme();
     if (kind === 'print') { printSpec(spec); return; }
     if (kind === 'xlsx') { downloadXlsx(spec, name + '.xlsx', 'Ocean EDU'); return; }
     var canvas = drawSheet(spec);
-    if (kind === 'pdf') downloadBlob(pdfFromCanvases(sliceCanvas(canvas)), name + '.pdf');
-    else canvas.toBlob(function (blob) { downloadBlob(blob, name + '.png'); });
+    if (kind === 'pdf') downloadBlob(pdfFromCanvases(sliceCanvas(canvas, spec.theme)), name + '.pdf');
+    else if (kind === 'jpg') canvas.toBlob(function (blob) { downloadBlob(blob, name + '.jpg'); }, 'image/jpeg', 0.92);
+    else canvas.toBlob(function (blob) { downloadBlob(blob, name + '.png'); }, 'image/png');
   }
 
   function exportSchedule(kind) {
@@ -6252,6 +6646,7 @@
       'download-data': 1, 'download-classes': 1, 'pick-folder': 1,
       'drop-image': 1, 'open-soa': 1, 'soa-drop': 1,
       'edit-staff': 1, 'save-staff': 1,
+      'people-add': 1, 'people-edit': 1, 'people-save': 1,
       'dup-transfer': 1, 'dup-skip': 1,
       'book-fold': 1, 'book-set': 1, 'book-message': 1, 'copy-report': 1, 'transfer-report-yes': 1
     };
@@ -6348,9 +6743,40 @@
       dictCopy(Number(btn.getAttribute('data-index')), act === 'dict-copy-mp4');
       return;
     }
+    if (act === 'people-layout') {
+      ui.peopleLayout = btn.getAttribute('data-layout') === 'list' ? 'list' : 'table';
+      render();
+      return;
+    }
+    if (act === 'people-open') {
+      ui.peopleKey = btn.getAttribute('data-key') || '';
+      ui.modal = null;
+      render();
+      return;
+    }
+    if (act === 'people-back') {
+      ui.peopleKey = '';
+      ui.modal = null;
+      render();
+      return;
+    }
+    if (act === 'people-add') {
+      ui.formError = '';
+      ui.modal = { type: 'people-form', key: '' };
+      render();
+      return;
+    }
+    if (act === 'people-edit') {
+      ui.formError = '';
+      ui.modal = { type: 'people-form', key: btn.getAttribute('data-key') || ui.peopleKey || '' };
+      render();
+      return;
+    }
+    if (act === 'people-save') { savePerson(); return; }
     if (act === 'nav') {
       ui.screen = btn.getAttribute('data-screen');
       ui.modal = null;
+      ui.peopleKey = '';
       ui.detailId = null;
       ui.detailEdit = false;
       if (ui.screen === 'classes') ui.selected = {};
@@ -7103,6 +7529,15 @@
   document.addEventListener('input', function (e) {
     if (e.target.id === 'rejoin-q') {
       paintRejoin(e.target.value);
+      return;
+    }
+    if (e.target.id === 'people-q') {
+      ui.peopleQuery = e.target.value;
+      var peopleQuery = String(e.target.value || '').trim().toLowerCase();
+      document.querySelectorAll('[data-person]').forEach(function (el) {
+        var blob = el.getAttribute('data-find') || '';
+        el.hidden = !!(peopleQuery && blob.indexOf(peopleQuery) < 0);
+      });
       return;
     }
     if (e.target.id === 'dict-q') {

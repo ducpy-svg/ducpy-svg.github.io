@@ -1217,6 +1217,29 @@ html[data-skin] td.book-slot.book-issued-unpaid { background: #ffe08a; color: #3
   font: 14px/1.45 "Be Vietnam Pro", Inter, Roboto, "Segoe UI", sans-serif;
 }
 .staff-card .btn { margin-top: 8px; }
+.people-table { min-width: 720px; }
+.people-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.people-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 3px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 4px 4px 0 var(--shadow);
+}
+.people-line p { margin: 0; }
+.people-detail {
+  margin-top: 12px;
+  padding: 14px;
+  border: 3px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 4px 4px 0 var(--shadow);
+}
+.people-detail p { margin: 0 0 8px; }
 .hw-note { color: #8a6a00; font-weight: 800; font-size: 12px; margin-top: 4px; text-align: center; }
 .hw-legend { margin-top: 12px; border: 3px solid var(--line); background: var(--paper2); padding: 8px 10px; }
 .hw-legend p { margin: 4px 0; }
@@ -1537,19 +1560,31 @@ html[data-frame="short"] .hw-cards { grid-template-columns: 1fr; }
     display: none !important;
   }
   #print-root { display: block !important; }
-  body { background: #fff; color: #12324a; }
-  #print-root h1 { font-size: 16px; margin: 0 0 6px; }
-  #print-root p { margin: 0 0 4px; font-size: 12px; }
+  body { background: var(--print-paper, #fff); color: var(--print-ink, #12324a); }
+  #print-root {
+    font-family: var(--print-font, "Segoe UI", sans-serif);
+    color: var(--print-ink, #12324a);
+    background: var(--print-paper, #fff);
+  }
+  #print-root h1 {
+    font-family: var(--print-head-font, inherit);
+    color: var(--print-head-ink, #0c4a72);
+    font-size: 16px;
+    margin: 0 0 6px;
+  }
+  #print-root p { margin: 0 0 4px; font-size: 12px; color: var(--print-muted, #3d6278); }
   #print-root table { width: 100%; border-collapse: collapse; font-size: 11px; }
   #print-root th, #print-root td {
-    border: 1px solid #0c4a72;
+    border: 1px solid var(--print-line, #0c4a72);
     padding: 4px;
-    vertical-align: top;
-    text-align: left;
+    vertical-align: middle;
+    text-align: center;
+    background: var(--print-chip, #fff);
+    color: var(--print-ink, #12324a);
   }
-  #print-root thead th { background: #d7eefc; }
-  #print-root tr.band td { background: #0c4a72; color: #f5fbff; font-weight: 800; }
-  #print-root tr.gap td { background: #e7f3fb; }
+  #print-root thead th { background: var(--print-head, #e5f4ff); color: var(--print-head-ink, #0c4a72); }
+  #print-root tr.band td { background: var(--print-band, #0c4a72); color: var(--print-band-ink, #f5fbff); font-weight: 800; }
+  #print-root tr.gap td { background: var(--print-gap, #e5f4ff); color: var(--print-ink, #12324a); }
 }
 @page { size: landscape; margin: 12mm; }
 

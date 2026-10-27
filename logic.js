@@ -2773,30 +2773,54 @@
       '</worksheet>';
   }
 
-  function stylesXml() {
+  function xlsxRgb(hex) {
+    var h = String(hex || '').replace('#', '').toUpperCase();
+    if (h.length === 3) h = h.charAt(0) + h.charAt(0) + h.charAt(1) + h.charAt(1) + h.charAt(2) + h.charAt(2);
+    if (!/^[0-9A-F]{6}$/.test(h)) h = '12324A';
+    return 'FF' + h;
+  }
+
+  function xlsxFontName(stack) {
+    var first = String(stack || '').split(',')[0].replace(/["']/g, '').trim();
+    if (!first || /^(sans-serif|serif|monospace|system-ui|cursive|fantasy)$/i.test(first)) return 'Calibri';
+    return xmlEsc(first).slice(0, 40);
+  }
+
+  function stylesXml(spec) {
+    var theme = spec && spec.theme ? spec.theme : {};
+    var ink = xlsxRgb(theme.ink || '#12324a');
+    var headInk = xlsxRgb(theme.headInk || '#0c4a72');
+    var bandInk = xlsxRgb(theme.bandInk || '#f5fbff');
+    var headFill = xlsxRgb(theme.paper2 || '#d7eefc');
+    var bandFill = xlsxRgb(theme.sea || '#0c4a72');
+    var gapFill = xlsxRgb(theme.paper2 || '#e7f3fb');
+    var dataFill = xlsxRgb(theme.chip || '#ffffff');
+    var line = xlsxRgb(theme.line || '#0c4a72');
+    var font = xlsxFontName(theme.font);
+    var titleFont = xlsxFontName(theme.headFont || theme.font);
     return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
       '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
       '<fonts count="4">' +
-      '<font><sz val="11"/><name val="Calibri"/></font>' +
-      '<font><b/><sz val="16"/><color rgb="FF0C4A72"/><name val="Calibri"/></font>' +
-      '<font><b/><sz val="11"/><color rgb="FF0C4A72"/><name val="Calibri"/></font>' +
-      '<font><b/><sz val="11"/><color rgb="FFF5FBFF"/><name val="Calibri"/></font>' +
+      '<font><sz val="11"/><color rgb="' + ink + '"/><name val="' + font + '"/></font>' +
+      '<font><b/><sz val="16"/><color rgb="' + headInk + '"/><name val="' + titleFont + '"/></font>' +
+      '<font><b/><sz val="11"/><color rgb="' + headInk + '"/><name val="' + font + '"/></font>' +
+      '<font><b/><sz val="11"/><color rgb="' + bandInk + '"/><name val="' + font + '"/></font>' +
       '</fonts>' +
       '<fills count="6">' +
       '<fill><patternFill patternType="none"/></fill>' +
       '<fill><patternFill patternType="gray125"/></fill>' +
-      '<fill><patternFill patternType="solid"><fgColor rgb="FFD7EEFC"/><bgColor rgb="FFD7EEFC"/></patternFill></fill>' +
-      '<fill><patternFill patternType="solid"><fgColor rgb="FF0C4A72"/><bgColor rgb="FF0C4A72"/></patternFill></fill>' +
-      '<fill><patternFill patternType="solid"><fgColor rgb="FFE7F3FB"/><bgColor rgb="FFE7F3FB"/></patternFill></fill>' +
-      '<fill><patternFill patternType="solid"><fgColor rgb="FFFFFFFF"/><bgColor rgb="FFFFFFFF"/></patternFill></fill>' +
+      '<fill><patternFill patternType="solid"><fgColor rgb="' + headFill + '"/><bgColor rgb="' + headFill + '"/></patternFill></fill>' +
+      '<fill><patternFill patternType="solid"><fgColor rgb="' + bandFill + '"/><bgColor rgb="' + bandFill + '"/></patternFill></fill>' +
+      '<fill><patternFill patternType="solid"><fgColor rgb="' + gapFill + '"/><bgColor rgb="' + gapFill + '"/></patternFill></fill>' +
+      '<fill><patternFill patternType="solid"><fgColor rgb="' + dataFill + '"/><bgColor rgb="' + dataFill + '"/></patternFill></fill>' +
       '</fills>' +
       '<borders count="2">' +
       '<border><left/><right/><top/><bottom/><diagonal/></border>' +
       '<border>' +
-      '<left style="thin"><color rgb="FF0C4A72"/></left>' +
-      '<right style="thin"><color rgb="FF0C4A72"/></right>' +
-      '<top style="thin"><color rgb="FF0C4A72"/></top>' +
-      '<bottom style="thin"><color rgb="FF0C4A72"/></bottom>' +
+      '<left style="thin"><color rgb="' + line + '"/></left>' +
+      '<right style="thin"><color rgb="' + line + '"/></right>' +
+      '<top style="thin"><color rgb="' + line + '"/></top>' +
+      '<bottom style="thin"><color rgb="' + line + '"/></bottom>' +
       '<diagonal/>' +
       '</border>' +
       '</borders>' +
@@ -2836,7 +2860,7 @@
         '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' +
         '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' +
         '</Relationships>') },
-      { name: 'xl/styles.xml', data: utf8(stylesXml()) },
+      { name: 'xl/styles.xml', data: utf8(stylesXml(spec)) },
       { name: 'xl/worksheets/sheet1.xml', data: utf8(sheetXml(spec)) }
     ];
     return zipStore(files);
