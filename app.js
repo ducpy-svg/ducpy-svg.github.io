@@ -2,7 +2,7 @@
   'use strict';
 
   var L = window.OceanLogic;
-  var APP_TITLE = 'Ocean EDU - Student management list (Unofficial) ver 1.5.8';
+  var APP_TITLE = 'Ocean EDU - Student management list (Unofficial) ver 1.5.9';
   var SUGGEST_URL = 'https://script.google.com/macros/s/AKfycbyNFHdMszhrmqyfXDHSDi2ti51y5_Ib3kiXgA5cGzcPkWLboUJSnPYJ5xwikb9N-fLOkg/exec';
   var PRIMARY_IDS = ['ocean', 'sky', 'teal', 'green', 'lime', 'amber', 'orange', 'coral', 'rose', 'violet', 'indigo', 'slate'];
   var SKIN_BOOK = [
@@ -325,7 +325,8 @@
         'Ocean EDU - Student management list (Unofficial) ver 1.5.4',
         'Ocean EDU - Student management list (Unofficial) ver 1.5.5',
         'Ocean EDU - Student management list (Unofficial) ver 1.5.6',
-        'Ocean EDU - Student management list (Unofficial) ver 1.5.7'
+        'Ocean EDU - Student management list (Unofficial) ver 1.5.7',
+        'Ocean EDU - Student management list (Unofficial) ver 1.5.8'
       ];
       if (!state.settings.title || legacyTitle.indexOf(state.settings.title) >= 0) state.settings.title = APP_TITLE;
       delete state.settings.supabaseUrl;
@@ -505,6 +506,7 @@
       if (item.pecMode) row.pecMode = String(item.pecMode);
       if (item.pecUser) row.pecUser = String(item.pecUser);
       if (item.pecPass) row.pecPass = String(item.pecPass);
+      if (item.remarkAt) row.remarkAt = String(item.remarkAt);
       return row;
     });
     var keep = [];
@@ -602,7 +604,9 @@
     if (!file || typeof file !== 'object') return;
     var newer = shareStamp(file) > (Date.parse(state.settings.savedAt || '') || 0);
     if (Array.isArray(file.archive)) {
-      state.archive = L.mergeById(state.archive || [], file.archive, newer);
+      var priorArchive = state.archive || [];
+      state.archive = L.mergeById(priorArchive, file.archive, newer);
+      syncArchiveRemarks(state.archive, priorArchive, file.archive);
       shareArchive = true;
     }
     if (Array.isArray(file.exams)) {
@@ -744,6 +748,123 @@
     return true;
   }
 
+  function remarkTime(value) {
+    var time = Date.parse(value || '');
+    return isNaN(time) ? 0 : time;
+  }
+
+  function remarkStamp(stu) {
+    var stamp = remarkTime(stu && stu.remarkAt);
+    remarkRowsOf(stu).forEach(function (item) {
+      var time = remarkTime(item && item.at);
+      if (time > stamp) stamp = time;
+    });
+    return stamp;
+  }
+
+  function remarkRowsOf(stu) {
+    return Array.isArray(stu && stu.remarks) ? stu.remarks : [];
+  }
+
+  function newerRemark(a, b) {
+    if (!a) return b;
+    if (!b) return a;
+    var left = remarkTime(a.at);
+    var right = remarkTime(b.at);
+    if (left !== right) return left > right ? a : b;
+    return a;
+  }
+
+  function mergeRemarkRows(primary, secondary) {
+    var byId = {};
+    function take(item) {
+      if (!item || !item.id) return;
+      var id = String(item.id);
+      byId[id] = byId[id] ? newerRemark(byId[id], item) : item;
+    }
+    (primary || []).forEach(take);
+    (secondary || []).forEach(take);
+    var bySession = {};
+    var loose = [];
+    Object.keys(byId).forEach(function (id) {
+      var item = byId[id];
+      var key = String(item.sessionKey || '');
+      if (!key) { loose.push(item); return; }
+      bySession[key] = bySession[key] ? newerRemark(bySession[key], item) : item;
+    });
+    var merged = loose.concat(Object.keys(bySession).map(function (key) { return bySession[key]; }));
+    merged.sort(function (a, b) {
+      var delta = remarkTime(a.at) - remarkTime(b.at);
+      if (delta) return delta;
+      return String(a.id).localeCompare(String(b.id));
+    });
+    return normalizeRemarks(merged);
+  }
+
+  function chooseRemarkSide(target, source, targetClass, sourceClass) {
+    var targetStamp = remarkStamp(target);
+    var sourceStamp = remarkStamp(source);
+    if (targetStamp !== sourceStamp) return targetStamp > sourceStamp ? target : source;
+    var targetRows = remarkRowsOf(target);
+    var sourceRows = remarkRowsOf(source);
+    var targetMarked = !!(target && target.remarkAt);
+    var sourceMarked = !!(source && source.remarkAt);
+    if (!targetRows.length && !sourceRows.length && !targetMarked && !sourceMarked) return target;
+    if (targetStamp === 0 && sourceStamp === 0) {
+      if (targetRows.length && !sourceRows.length) return target;
+      if (sourceRows.length && !targetRows.length) return source;
+    }
+    var targetClassTime = remarkTime(targetClass && targetClass.updatedAt);
+    var sourceClassTime = remarkTime(sourceClass && sourceClass.updatedAt);
+    if (targetClassTime !== sourceClassTime) return targetClassTime > sourceClassTime ? target : source;
+    if (!sourceRows.length) return target;
+    if (!targetRows.length) return source;
+    var merged = mergeRemarkRows(targetRows, sourceRows);
+    if (JSON.stringify(normalizeRemarks(targetRows)) === JSON.stringify(merged)) return target;
+    return merged;
+  }
+
+  function applyRemarkChoice(target, source, choice) {
+    if (!target || !choice || choice === target) return;
+    if (choice === source) {
+      if (Array.isArray(source.remarks)) target.remarks = normalizeRemarks(source.remarks);
+      else delete target.remarks;
+      if (source.remarkAt) target.remarkAt = String(source.remarkAt);
+      else delete target.remarkAt;
+      return;
+    }
+    target.remarks = choice;
+    var iso = '';
+    var max = 0;
+    choice.forEach(function (item) {
+      var time = remarkTime(item && item.at);
+      if (time >= max) { max = time; iso = item && item.at ? String(item.at) : iso; }
+    });
+    if (source && source.remarkAt && remarkTime(source.remarkAt) >= max) iso = String(source.remarkAt);
+    if (target.remarkAt && remarkTime(target.remarkAt) > max) iso = String(target.remarkAt);
+    if (iso) target.remarkAt = iso;
+  }
+
+  function syncStudentRemarks(target, source, targetClass, sourceClass) {
+    if (!target || !source || target === source) return;
+    applyRemarkChoice(target, source, chooseRemarkSide(target, source, targetClass, sourceClass));
+  }
+
+  function syncArchiveRemarks(merged, local, incoming) {
+    var localBy = {};
+    var incomingBy = {};
+    (local || []).forEach(function (row) { if (row && row.id) localBy[String(row.id)] = row; });
+    (incoming || []).forEach(function (row) { if (row && row.id) incomingBy[String(row.id)] = row; });
+    (merged || []).forEach(function (row) {
+      if (!row || !row.id) return;
+      var left = localBy[String(row.id)];
+      var right = incomingBy[String(row.id)];
+      if (!left || !right) return;
+      var other = row === left ? right : left;
+      syncStudentRemarks(row, other, null, null);
+    });
+  }
+
   function fillClassBags(kept, other) {
     if (!Array.isArray(kept) || !Array.isArray(other)) return;
     var classes = {};
@@ -753,21 +874,22 @@
       (cls.students || []).forEach(function (stu) {
         if (stu && stu.id) students[stu.id] = stu;
       });
-      classes[cls.id] = students;
+      classes[cls.id] = { cls: cls, students: students };
     });
     kept.forEach(function (cls) {
-      var students = classes[cls && cls.id];
-      if (!students) return;
+      var bag = classes[cls && cls.id];
+      if (!bag) return;
       (cls.students || []).forEach(function (stu) {
-        if (!stu || !stu.id || !students[stu.id]) return;
-        var from = students[stu.id];
+        if (!stu || !stu.id || !bag.students[stu.id]) return;
+        var from = bag.students[stu.id];
         STUDENT_SHARE_KEYS.forEach(function (key) {
+          if (key === 'remarks') return;
           if (!studentBagAbsent(stu[key], key) || !studentBagPresent(from[key])) return;
           stu[key] = from[key];
-          if (key === 'remarks' && Array.isArray(stu.remarks)) stu.remarks = normalizeRemarks(stu.remarks);
           if (key === 'care' && stu.care) stu.care = normalizeCare(stu.care);
           if (key === 'photo') stu.photo = safePhotoName(stu.photo);
         });
+        syncStudentRemarks(stu, from, cls, bag.cls);
       });
     });
   }
@@ -2959,7 +3081,9 @@
       if (!text) return;
       any = true;
       if (!Array.isArray(stu.remarks)) stu.remarks = [];
-      stu.remarks.push({ id: L.uid(), sessionKey: draft.sessionKey, sessionLabel: label, text: text, at: new Date().toISOString(), by: ui.user ? ui.user.name : '' });
+      var remarkedAt = new Date().toISOString();
+      stu.remarkAt = remarkedAt;
+      stu.remarks.push({ id: L.uid(), sessionKey: draft.sessionKey, sessionLabel: label, text: text, at: remarkedAt, by: ui.user ? ui.user.name : '' });
     });
     if (!any) { toast('Chọn học viên và ghi nội dung trước khi xong.'); return; }
     ui.remarkDraft = { classId: cls.id, sessionKey: draft.sessionKey, texts: {}, ticks: {}, editing: false, bulk: '' };
@@ -3001,6 +3125,8 @@
     var text = spec.comment ? markup : '';
     if (spec.comment && !remarkToPlain(text)) { toast('Viết nhận xét trước khi lưu.'); return; }
     if (!Array.isArray(stu.remarks)) stu.remarks = [];
+    var remarkedAt = new Date().toISOString();
+    stu.remarkAt = remarkedAt;
     if (spec.id === 'uncategorized') {
       stu.remarks = stu.remarks.filter(function (item) { return !item || item.sessionKey !== sessionKey; });
     } else {
@@ -3009,7 +3135,7 @@
         current.tag = spec.id;
         current.text = text;
         current.sessionLabel = label;
-        current.at = new Date().toISOString();
+        current.at = remarkedAt;
         current.by = ui.user ? ui.user.name : '';
       } else {
         stu.remarks.push({
@@ -3018,7 +3144,7 @@
           sessionLabel: label,
           text: text,
           tag: spec.id,
-          at: new Date().toISOString(),
+          at: remarkedAt,
           by: ui.user ? ui.user.name : ''
         });
       }

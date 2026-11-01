@@ -926,6 +926,7 @@
     if (stu.pecMode) row.pecMode = stu.pecMode;
     if (stu.pecUser) row.pecUser = stu.pecUser;
     if (stu.pecPass) row.pecPass = stu.pecPass;
+    if (stu.remarkAt) row.remarkAt = String(stu.remarkAt);
     return row;
   }
 
