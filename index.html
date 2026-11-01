@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Ocean EDU - Student management list (Unofficial) ver 1.4.7</title>
+  <title>Ocean EDU - Student management list (Unofficial) ver 1.5.2</title>
   <link rel="icon" href="Token.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,6 +13,12 @@
     try {
       var saved = JSON.parse(localStorage.getItem('oceanEdu.v1') || '{}');
       var skins = ['default', 'y2k', 'mcbling', 'aero', 'preppy', 'goth', 'fantasy', 'aerox', 'vapor', 'indie', 'seapunk', 'cottage', 'academia', 'goblin', 'lightac', 'neo2k', 'realism', 'dark', 'classic', 'disrupt', 'collage', 'cyber'];
+      var skinIface = {
+        default: 'classic', y2k: 'square', mcbling: 'soft', aero: 'glass', preppy: 'ruled', goth: 'stark', fantasy: 'soft',
+        aerox: 'glass', vapor: 'grid', indie: 'collage', seapunk: 'glass', cottage: 'soft', academia: 'notebook',
+        goblin: 'stark', lightac: 'ruled', neo2k: 'square', realism: 'glass', dark: 'compact', classic: 'ruled',
+        disrupt: 'poster', collage: 'collage', cyber: 'grid'
+      };
       var skin = 'default';
       var who = JSON.parse(sessionStorage.getItem('oceanEduUser') || 'null');
       var accounts = saved.accounts || [];
@@ -26,6 +32,7 @@
       document.documentElement.setAttribute('data-theme', 'day');
       document.documentElement.setAttribute('data-primary', 'ocean');
       document.documentElement.setAttribute('data-skin', skin);
+      document.documentElement.setAttribute('data-iface', skinIface[skin] || 'classic');
     } catch (e) {}
   </script>
 </head>
@@ -95,7 +102,7 @@
         </div>
         <p class="field-label">Giao diện</p>
         <div id="skin-groups" class="skin-groups"></div>
-        <p class="help">Default giữ bảng màu sóng biển. Ba nhóm giao diện nằm bên dưới: bấm tên nhóm để xem khung xem trước và mô tả, rồi bấm một giao diện để dùng.</p>
+        <p class="help">Default giữ bảng màu sóng biển. Ba nhóm giao diện nằm bên dưới: bấm tên nhóm để xem khung xem trước và mô tả, rồi bấm một giao diện để dùng. Mỗi giao diện mang sẵn khung phù hợp, không chọn khung riêng.</p>
         <label class="field">
           <span>Tiêu đề</span>
           <input id="setting-title" type="text" maxlength="120" required>

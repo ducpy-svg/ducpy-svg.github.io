@@ -587,7 +587,8 @@
       to: null,
       name: newName
     });
-    pushNotice(state, announcedAt, formatDMY(at) + ': ' + oldName + ' đã lên thành ' + newName + '.');
+    cls.codeHold = true;
+    pushNotice(state, announcedAt, formatDMY(at) + ': ' + oldName + ' đã lên thành ' + newName + '. Cập nhật mã lớp trước khi vào sổ tay.');
     return { oldName: oldName, newName: newName, at: when, done: false };
   }
 
@@ -756,6 +757,8 @@
       customLevel: custom ? String(input.customLevel || '') : '',
       homeTrack: homeTrack,
       endOpen: !!(custom && input.endOpen),
+      classCode: String(input.classCode || '').trim(),
+      codeHold: false,
       sessionChanges: [],
       completed: false,
       completedAt: null,
@@ -773,6 +776,9 @@
       gender: input.gender || 'Nam',
       dob: input.dob || '',
       phone: input.phone || '',
+      phone2: input.phone2 || '',
+      parentName: input.parentName || '',
+      photo: input.photo || '',
       ec: input.ec || '',
       status: 'active',
       stoppedAt: null,
@@ -893,6 +899,11 @@
       gender: stu.gender || '',
       dob: stu.dob || '',
       phone: stu.phone || '',
+      phone2: stu.phone2 || '',
+      parentName: stu.parentName || '',
+      photo: stu.photo || '',
+      care: stu.care && typeof stu.care === 'object' && !Array.isArray(stu.care) ? stu.care : {},
+      remarks: Array.isArray(stu.remarks) ? stu.remarks : [],
       ec: stu.ec || '',
       enroll: enrollOf(stu),
       joinedAt: stu.joinedAt || '',
@@ -1557,6 +1568,24 @@
     return books.map(function (book) { return book.name; }).join(' · ');
   }
 
+  function classLevelBooks(cls, level) {
+    var key = levelKey(level);
+    var custom = cls && level && level.to && cls.levelBooks && key ? cls.levelBooks[key] : null;
+    if (Array.isArray(custom)) {
+      var out = [];
+      custom.forEach(function (item) {
+        if (out.length >= 6 || !item) return;
+        var name = String(item.name || '').trim();
+        if (!name) return;
+        var price = Math.round(Number(item.price) || 0);
+        if (price < 0) price = 0;
+        out.push({ name: name.slice(0, 80), price: price });
+      });
+      if (out.length) return out;
+    }
+    return curriculumBooks(level && level.gradeId);
+  }
+
   function formatVnd(amount) {
     var n = Math.round(Number(amount) || 0);
     return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + 'đ';
@@ -1583,7 +1612,7 @@
     var books = [];
     if (bag && Array.isArray(bag.books)) {
       bag.books.forEach(function (item, index) {
-        if (index > 1 || !item) return;
+        if (index > 5 || !item) return;
         books.push({
           status: cleanBookStatus(item.status || item.bookStatus),
           statusAt: item.statusAt ? String(item.statusAt) : ''
@@ -1600,7 +1629,7 @@
     return {
       bookStatus: books[0].status,
       bookStatusAt: books[0].statusAt,
-      books: books.slice(0, 2),
+      books: books.slice(0, 6),
       pecMode: self ? 'self' : '',
       pecUser: self ? '' : String((bag && bag.pecUser) || ''),
       pecPass: self ? '' : String((bag && bag.pecPass) || '')
@@ -1662,7 +1691,7 @@
         var studentPaid = false;
         levels.forEach(function (level) {
           if (!level) return;
-          var catalog = curriculumBooks(level.gradeId);
+          var catalog = classLevelBooks(cls, level);
           if (!catalog.length) return;
           var rec = bookOf(stu, level);
           catalog.forEach(function (book, index) {
@@ -1910,6 +1939,51 @@
     return found;
   }
 
+  function holderFrom(stu, className, where) {
+    return {
+      id: stu.id,
+      name: stu.name || '',
+      code: codeKey(stu.code),
+      className: className || '',
+      where: where,
+      englishName: stu.englishName || '',
+      gender: stu.gender || '',
+      dob: stu.dob || '',
+      phone: stu.phone || '',
+      phone2: stu.phone2 || '',
+      parentName: stu.parentName || '',
+      ec: stu.ec || ''
+    };
+  }
+
+  function findCodeHolder(classes, code, exceptId, archive) {
+    var text = codeKey(code);
+    if (!text) return null;
+    var found = null;
+    (classes || []).forEach(function (cls) {
+      if (found) return;
+      (cls.students || []).forEach(function (stu) {
+        if (found || !stu || stu.id === exceptId || codeKey(stu.code) !== text) return;
+        found = holderFrom(stu, currentName(cls), 'class');
+      });
+    });
+    if (found) return found;
+    (archive || []).forEach(function (stu) {
+      if (found || !stu || !archiveKeepsCode(stu) || stu.id === exceptId || codeKey(stu.code) !== text) return;
+      found = holderFrom(stu, '', 'archive');
+    });
+    return found;
+  }
+
+  function holderText(holder) {
+    if (!holder) return '';
+    var name = String(holder.name || '').trim() || 'học viên';
+    var code = holder.code ? ' (' + holder.code + ')' : '';
+    if (holder.where === 'archive') return name + code + ', trong Học viên cũ/kết thúc';
+    if (holder.className) return name + code + ', lớp ' + holder.className;
+    return name + code;
+  }
+
   function classJustUpdated(cls, now) {
     var stamp = cls && cls.updatedAt;
     if (!stamp) return false;
@@ -2043,8 +2117,10 @@
       var gender = genderRaw ? (normalizeGender(genderRaw) || '?') : '?';
       if (!code) code = nextFreeCode(classes || [], taken);
       if (taken[code]) {
-        if (archivedCode[code]) errors.push('Hàng ' + line + ': trùng mã ' + code + '. Mã này nằm trong Học viên cũ/kết thúc. Dùng Thêm học viên để cho em vào lại lớp.');
-        else errors.push('Hàng ' + line + ': trùng mã ' + code + '.');
+        var holder = findCodeHolder(classes, code, null, archive);
+        var who = holderText(holder);
+        if (archivedCode[code]) errors.push('Hàng ' + line + ': trùng mã ' + code + '. ' + (who ? ('Mã này của ' + who + '. ') : 'Mã này nằm trong Học viên cũ/kết thúc. ') + 'Dùng Thêm học viên để cho em vào lại lớp.');
+        else errors.push('Hàng ' + line + ': trùng mã ' + code + (who ? '. Mã này của ' + who + '.' : '.'));
         continue;
       }
       taken[code] = true;
@@ -2133,15 +2209,11 @@
         var byCode = !!(wanted && codeKey(stu.code) === wanted);
         if (!byName && !byCode) return;
         seen[stu.id] = true;
-        hits.push({
-          id: stu.id,
-          fromId: host.id,
-          name: stu.name || '',
-          code: codeKey(stu.code),
-          className: currentName(host),
-          joined: stu.joinedAt || '',
-          by: byName && byCode ? 'both' : (byCode ? 'code' : 'name')
-        });
+        var hit = holderFrom(stu, currentName(host), 'class');
+        hit.fromId = host.id;
+        hit.joined = stu.joinedAt || '';
+        hit.by = byName && byCode ? 'both' : (byCode ? 'code' : 'name');
+        hits.push(hit);
       });
     });
     return hits;
@@ -2213,7 +2285,9 @@
         var current = Object.assign({}, target, patched[target.id]);
         var patch = fillPatch(current, fields, taken);
         if (patch.codeError) {
-          errors.push('Hàng ' + line + ': trùng mã ' + patch.codeError + ', không ghi vào học viên đang có.');
+          var patchHolder = findCodeHolder(classes, patch.codeError, target.id, archive);
+          var patchWho = holderText(patchHolder);
+          errors.push('Hàng ' + line + ': trùng mã ' + patch.codeError + ', không ghi vào học viên đang có' + (patchWho ? '. Mã này của ' + patchWho + '.' : '.'));
           delete patch.codeError;
         }
         if (patch.code) {
@@ -2238,7 +2312,10 @@
       if (hits.length) {
         var repeated = hits.some(function (hit) { return linkedIds[hit.id]; });
         if (repeated) {
-          errors.push('Hàng ' + line + ': trùng học viên đang học ở lớp khác, đã nằm ở hàng trước.');
+          var again = hits.map(function (hit) {
+            return (hit.name || 'học viên') + (hit.className ? ' · ' + hit.className : '');
+          }).join('; ');
+          errors.push('Hàng ' + line + ': trùng học viên đang học ở lớp khác' + (again ? ' (' + again + ')' : '') + ', đã nằm ở hàng trước.');
           continue;
         }
         hits.forEach(function (hit) { linkedIds[hit.id] = true; });
@@ -2261,8 +2338,10 @@
       var code = typedCode;
       if (!code) code = nextFreeCode(classes || [], taken);
       if (taken[code]) {
-        if (owners[code]) errors.push('Hàng ' + line + ': trùng mã ' + code + '.');
-        else errors.push('Hàng ' + line + ': trùng mã ' + code + '. Mã này nằm trong Học viên cũ/kết thúc. Dùng Thêm học viên để cho em vào lại lớp.');
+        var late = findCodeHolder(classes, code, null, archive);
+        var lateWho = holderText(late);
+        if (owners[code]) errors.push('Hàng ' + line + ': trùng mã ' + code + (lateWho ? '. Mã này của ' + lateWho + '.' : '.'));
+        else errors.push('Hàng ' + line + ': trùng mã ' + code + '. ' + (lateWho ? ('Mã này của ' + lateWho + '. ') : 'Mã này nằm trong Học viên cũ/kết thúc. ') + 'Dùng Thêm học viên để cho em vào lại lớp.');
         continue;
       }
       taken[code] = 'new';
@@ -3696,6 +3775,7 @@
     homeworkLevel: homeworkLevel,
     attendanceUnavailable: attendanceUnavailable,
     curriculumBooks: curriculumBooks,
+    classLevelBooks: classLevelBooks,
     curriculumName: curriculumName,
     formatVnd: formatVnd,
     BOOK_STATUS: BOOK_STATUS,
@@ -3716,6 +3796,8 @@
     nextStudentCode: nextStudentCode,
     codeTaken: codeTaken,
     codeKey: codeKey,
+    findCodeHolder: findCodeHolder,
+    holderText: holderText,
     findOfficialTwins: findOfficialTwins,
     classJustUpdated: classJustUpdated,
     STUDENT_COLUMNS: STUDENT_COLUMNS,
