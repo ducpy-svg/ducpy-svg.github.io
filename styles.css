@@ -3433,6 +3433,7 @@ html[data-iface="ruled"] #app {
 html[data-iface="notebook"] .board,
 html[data-iface="notebook"] .panel,
 html[data-iface="notebook"] .remark-slip,
+html[data-iface="notebook"] .remark-card,
 html[data-iface="notebook"] .profile-window { font-family: "Crimson Pro", "Be Vietnam Pro", serif; }
 html[data-iface="stark"] .menu-card,
 html[data-iface="stark"] .btn,
@@ -3769,4 +3770,284 @@ html[data-skin="classic"] .band-noon td {
   .exam-score-head { display: none; }
   .exam-score-row { grid-template-columns: 1fr 1fr; }
 }
+
+.remark-admin,
+.remark-ngan,
+.remark-session {
+  border: 3px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+}
+.remark-admin { margin: 0 0 12px; padding: 10px; }
+.remark-board {
+  max-height: 70vh;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.remark-ngan > summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-weight: 900;
+}
+.remark-ngan.group-kindy { box-shadow: inset 8px 0 0 #ca8a04; }
+.remark-ngan.group-kids { box-shadow: inset 8px 0 0 #0284c7; }
+.remark-ngan.group-teens { box-shadow: inset 8px 0 0 #e11d48; }
+.remark-ngan.group-ielts { box-shadow: inset 8px 0 0 #15803d; }
+.remark-ngan.group-custom { box-shadow: inset 8px 0 0 #7e22ce; }
+.remark-sessions {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 8px;
+}
+.remark-session {
+  flex: 0 0 300px;
+  max-height: 460px;
+  overflow: auto;
+  padding: 8px;
+}
+.remark-session h3 { margin: 0 0 8px; font-size: 15px; }
+.remark-card {
+  margin: 0 0 8px;
+  padding: 8px;
+  border: 2px solid #111111;
+  background: #ffffff;
+  color: #111111;
+}
+.remark-card header { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
+.remark-card header small { font-weight: 700; }
+.remark-chips, .remark-legend { display: flex; flex-wrap: wrap; gap: 4px; }
+.remark-chip, .remark-pill {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  margin: 4px 4px 0 0;
+  padding: 4px 6px;
+  border: 2px solid #111111;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: left;
+  background-image: none;
+}
+.remark-chip small, .remark-pill small { font-weight: 700; }
+.remark-chip.is-on { outline: 3px solid #111111; }
+.remark-note { width: 100%; min-height: 64px; margin-top: 6px; color: #111111; background: #ffffff; }
+.remark-note:disabled { opacity: 0.55; }
+.remark-card.tag-finished { background: #dcfce7; color: #14532d; }
+.remark-card.tag-redo { background: #dbeafe; color: #1e3a8a; }
+.remark-card.tag-issue { background: #fef3c7; color: #713f12; }
+.remark-card.tag-incomplete { background: #fecdd3; color: #9f1239; }
+.remark-card.tag-absent { background: #e5e7eb; color: #1f2937; }
+.remark-card.tag-uncategorized,
+.remark-card.tag-plain { background: #ffffff; color: #111111; }
+.remark-chip.tag-finished,
+.remark-pill.tag-finished { background: #15803d; color: #ffffff; }
+.remark-chip.tag-redo,
+.remark-pill.tag-redo { background: #1d4ed8; color: #ffffff; }
+.remark-chip.tag-issue,
+.remark-pill.tag-issue { background: #fde047; color: #111111; }
+.remark-chip.tag-incomplete,
+.remark-pill.tag-incomplete { background: #b91c1c; color: #ffffff; }
+.remark-chip.tag-absent,
+.remark-pill.tag-absent { background: #4b5563; color: #f8fafc; }
+.remark-chip.tag-uncategorized,
+.remark-pill.tag-uncategorized { background: #ffffff; color: #111111; }
+html[data-skin] .remark-chip.tag-finished,
+html[data-skin] .remark-pill.tag-finished { background: #15803d; color: #ffffff; background-image: none; }
+html[data-skin] .remark-chip.tag-redo,
+html[data-skin] .remark-pill.tag-redo { background: #1d4ed8; color: #ffffff; background-image: none; }
+html[data-skin] .remark-chip.tag-issue,
+html[data-skin] .remark-pill.tag-issue { background: #fde047; color: #111111; background-image: none; }
+html[data-skin] .remark-chip.tag-incomplete,
+html[data-skin] .remark-pill.tag-incomplete { background: #b91c1c; color: #ffffff; background-image: none; }
+html[data-skin] .remark-chip.tag-absent,
+html[data-skin] .remark-pill.tag-absent { background: #4b5563; color: #f8fafc; background-image: none; }
+html[data-skin] .remark-chip.tag-uncategorized,
+html[data-skin] .remark-pill.tag-uncategorized { background: #ffffff; color: #111111; background-image: none; }
+
+.remark-note-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px 14px;
+  align-items: flex-start;
+  padding-top: 16px;
+}
+.remark-note-scroll,
+.remark-fold-body {
+  max-height: 62vh;
+  overflow: auto;
+  padding: 16px 8px 10px;
+}
+.remark-roster {
+  margin-top: 10px;
+  border: 3px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+}
+.remark-roster > summary {
+  padding: 8px 10px;
+  cursor: pointer;
+  font-weight: 900;
+}
+.remark-fold { margin: 8px 0 16px; background: transparent; border: 0; }
+.remark-fold > summary {
+  display: block;
+  width: 246px;
+  cursor: pointer;
+  list-style: none;
+}
+.remark-fold > summary::-webkit-details-marker { display: none; }
+.remark-day { margin: 0 0 16px; }
+.remark-day h3 { margin: 0 0 8px; font-size: 16px; color: var(--ink); }
+.remark-board { padding-top: 16px; }
+article.remark-note {
+  width: 280px;
+  margin: 0;
+  padding: 18px 12px 12px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  border: 4px solid var(--group, var(--line));
+  box-shadow: 6px 6px 0 var(--shadow);
+  background-color: #fffef6;
+  background-image: repeating-linear-gradient(transparent, transparent 22px, rgba(17, 17, 17, 0.08) 23px);
+  color: #111111;
+}
+article.remark-note::before,
+.remark-class-note::before {
+  content: "";
+  position: absolute;
+  top: -10px;
+  left: 18px;
+  width: 54px;
+  height: 16px;
+  background: #fde047;
+  border: 2px solid #111111;
+  transform: rotate(-6deg);
+}
+article.remark-note strong,
+.remark-class-note strong { display: block; font-size: 16px; margin-bottom: 4px; }
+article.remark-note > span,
+.remark-class-note > span { display: block; font-size: 13px; line-height: 1.35; }
+article.remark-note textarea.remark-note {
+  width: 100%;
+  min-height: 64px;
+  margin-top: 6px;
+  color: #111111;
+  background: #ffffff;
+  background-image: none;
+}
+.remark-class-note {
+  display: block;
+  width: 230px;
+  min-height: 0;
+  margin: 14px 0 0;
+  padding: 18px 12px 12px;
+  position: relative;
+  border: 4px solid var(--group, var(--line));
+  box-shadow: 6px 6px 0 var(--shadow);
+  text-align: left;
+  background-color: #fffef6;
+  color: #111111;
+}
+article.remark-note.group-kindy,
+.remark-class-note.group-kindy { background-color: #fff6d4; color: #3d2e00; }
+article.remark-note.group-kids,
+.remark-class-note.group-kids { background-color: #e4f2ff; color: #0c3a66; }
+article.remark-note.group-teens,
+.remark-class-note.group-teens { background-color: #ffe4e8; color: #6a1220; }
+article.remark-note.group-ielts,
+.remark-class-note.group-ielts { background-color: #d8f3dc; color: #14532d; }
+article.remark-note.group-custom,
+.remark-class-note.group-custom { background-color: #f3e8ff; color: #3b1764; }
+[data-theme="night"] article.remark-note.group-ielts,
+[data-theme="night"] .remark-class-note.group-ielts { background-color: #14532d; color: #dcfce7; }
+html[data-skin] article.remark-note.group-kindy,
+html[data-skin] .remark-class-note.group-kindy { background-color: #fff6d4; color: #3d2e00; }
+html[data-skin] article.remark-note.group-kids,
+html[data-skin] .remark-class-note.group-kids { background-color: #e4f2ff; color: #0c3a66; }
+html[data-skin] article.remark-note.group-teens,
+html[data-skin] .remark-class-note.group-teens { background-color: #ffe4e8; color: #6a1220; }
+html[data-skin] article.remark-note.group-ielts,
+html[data-skin] .remark-class-note.group-ielts { background-color: #d8f3dc; color: #14532d; }
+html[data-skin] article.remark-note.group-custom,
+html[data-skin] .remark-class-note.group-custom { background-color: #f3e8ff; color: #3b1764; }
+html[data-theme="night"] article.remark-note.group-ielts,
+html[data-theme="night"] .remark-class-note.group-ielts { background-color: #14532d; color: #dcfce7; }
+
+.remark-scrim { z-index: 24; }
+.modal.remark-editor { width: min(440px, 100%); }
+.remark-tools { display: flex; gap: 6px; margin-top: 8px; }
+.remark-tools .btn { min-width: 36px; font-weight: 800; }
+.remark-detail,
+.remark-composer {
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #111111;
+  background: #ffffff;
+  background-image: none;
+}
+article.remark-note .remark-detail {
+  margin-top: 6px;
+  padding: 6px 8px;
+}
+.remark-composer {
+  min-height: 140px;
+  max-height: 46vh;
+  overflow: auto;
+  margin-top: 8px;
+  padding: 8px;
+  border: 2px solid #111111;
+}
+.remark-composer[contenteditable="false"] { opacity: 0.55; }
+.remark-composer div,
+.remark-composer p { margin: 0; min-height: 1.55em; }
+.remark-detail b,
+.remark-detail strong,
+.remark-composer b,
+.remark-composer strong { font-weight: 800; }
+.remark-detail i,
+.remark-detail em,
+.remark-composer i,
+.remark-composer em { font-style: italic; }
+.remark-detail u,
+.remark-composer u { text-decoration: underline; }
+article.remark-note .remark-revise { margin-top: 8px; align-self: flex-start; }
+html[data-skin] .remark-detail,
+html[data-skin] .remark-composer,
+html[data-theme="night"] .remark-detail,
+html[data-theme="night"] .remark-composer,
+html[data-theme="night"] article.remark-note.group-ielts .remark-detail,
+html[data-skin] article.remark-note .remark-detail,
+html[data-skin] .remark-composer {
+  color: #111111;
+  background-color: #ffffff;
+  background-image: none;
+}
+html[data-skin] .remark-detail b,
+html[data-skin] .remark-detail strong,
+html[data-skin] .remark-composer b,
+html[data-skin] .remark-composer strong { font-weight: 800; }
+html[data-skin] .remark-detail i,
+html[data-skin] .remark-detail em,
+html[data-skin] .remark-composer i,
+html[data-skin] .remark-composer em { font-style: italic; }
+html[data-skin] .remark-detail u,
+html[data-skin] .remark-composer u { text-decoration: underline; }
+html[data-skin] button.remark-italic,
+html[data-theme="night"] button.remark-italic { font-style: italic; }
+html[data-skin] button.remark-bold,
+html[data-theme="night"] button.remark-bold { font-weight: 800; }
+html[data-skin] button.remark-under,
+html[data-theme="night"] button.remark-under { text-decoration: underline; }
+[data-scroll-keep] { overflow-anchor: none; scrollbar-gutter: stable; }
 

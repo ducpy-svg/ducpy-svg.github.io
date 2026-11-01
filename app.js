@@ -2,7 +2,7 @@
   'use strict';
 
   var L = window.OceanLogic;
-  var APP_TITLE = 'Ocean EDU - Student management list (Unofficial) ver 1.5.2';
+  var APP_TITLE = 'Ocean EDU - Student management list (Unofficial) ver 1.5.7';
   var SUGGEST_URL = 'https://script.google.com/macros/s/AKfycbyNFHdMszhrmqyfXDHSDi2ti51y5_Ib3kiXgA5cGzcPkWLboUJSnPYJ5xwikb9N-fLOkg/exec';
   var PRIMARY_IDS = ['ocean', 'sky', 'teal', 'green', 'lime', 'amber', 'orange', 'coral', 'rose', 'violet', 'indigo', 'slate'];
   var SKIN_BOOK = [
@@ -157,6 +157,7 @@
     examWizard: null,
     examWeek: '',
     examFolds: {},
+    examFilter: { fet: '', grade: '', program: '' },
     staffMonth: '',
     mailMonth: '',
     mailId: '',
@@ -187,10 +188,25 @@
     remarkLayout: 'cards',
     remarkSort: 'level',
     remarkQuery: '',
+    remarkMonth: '',
+    remarkSession: '',
+    remarkOpenClass: '',
     remarkDraft: null,
     remarkReadId: '',
-    remarkSlip: ''
+    remarkSlip: '',
+    remarkEditor: null
   };
+  var scrollLatch = { key: '' };
+
+  var remarkPainting = false;
+  var REMARK_TAGS = [
+    { id: 'finished', en: 'Homework finished', vi: 'Hoàn thành bài tập', comment: true },
+    { id: 'redo', en: 'Unfinished', vi: 'Thiếu bài/ làm lại bài', comment: true },
+    { id: 'issue', en: 'Issue', vi: 'Có vấn đề', comment: true },
+    { id: 'incomplete', en: 'Unfinished', vi: 'Chưa hoàn thành bài tập', comment: true },
+    { id: 'absent', en: 'Absent', vi: 'Vắng mặt', comment: false },
+    { id: 'uncategorized', en: 'Uncategorized', vi: 'Chưa nhận xét', comment: false }
+  ];
 
   var droppedArchive = [];
   var archivePurgePersist = false;
@@ -303,7 +319,12 @@
         'Ocean EDU - Student management list (Unofficial) ver 1.4.8',
         'Ocean EDU - Student management list (Unofficial) ver 1.4.9',
         'Ocean EDU - Student management list (Unofficial) ver 1.5.0',
-        'Ocean EDU - Student management list (Unofficial) ver 1.5.1'
+        'Ocean EDU - Student management list (Unofficial) ver 1.5.1',
+        'Ocean EDU - Student management list (Unofficial) ver 1.5.2',
+        'Ocean EDU - Student management list (Unofficial) ver 1.5.3',
+        'Ocean EDU - Student management list (Unofficial) ver 1.5.4',
+        'Ocean EDU - Student management list (Unofficial) ver 1.5.5',
+        'Ocean EDU - Student management list (Unofficial) ver 1.5.6'
       ];
       if (!state.settings.title || legacyTitle.indexOf(state.settings.title) >= 0) state.settings.title = APP_TITLE;
       delete state.settings.supabaseUrl;
@@ -1961,18 +1982,32 @@
     return out;
   }
 
+  function remarkTagInfo(id) {
+    var key = String(id || '');
+    for (var i = 0; i < REMARK_TAGS.length; i++) {
+      if (REMARK_TAGS[i].id === key) return REMARK_TAGS[i];
+    }
+    return null;
+  }
+
   function normalizeRemarks(list) {
+    var keepTag = { finished: 1, redo: 1, issue: 1, incomplete: 1, absent: 1 };
     return (Array.isArray(list) ? list : []).filter(function (item) {
-      return item && item.id && String(item.text || '').trim();
+      if (!item || !item.id) return false;
+      var text = String(item.text || '').trim();
+      return !!(text || keepTag[item.tag]);
     }).map(function (item) {
-      return {
+      var text = String(item.text || '');
+      var row = {
         id: String(item.id),
         sessionKey: String(item.sessionKey || ''),
         sessionLabel: String(item.sessionLabel || ''),
-        text: String(item.text || ''),
+        text: text,
         at: item.at || '',
         by: String(item.by || '')
       };
+      if (keepTag[item.tag]) row.tag = item.tag;
+      return row;
     });
   }
 
@@ -2267,7 +2302,11 @@
       return list.length ? '<ul class="history-list">' + list.map(function (line) { return '<li>' + esc(line) + '</li>'; }).join('') + '</ul>' : '<p class="muted">' + empty + '</p>';
     }
     var remarkHtml = remarks.length ? '<ul class="history-list">' + remarks.map(function (item) {
-      return '<li><strong>' + esc(item.sessionLabel || item.sessionKey) + ':</strong> ' + esc(item.text) + '</li>';
+      var tag = remarkTagInfo(item.tag);
+      var tagText = tag ? esc(tag.en + ' · ' + tag.vi) + (item.text ? ' · ' : '') : '';
+      var body = remarkToEditorHtml(item.text);
+      return '<li><strong>' + esc(item.sessionLabel || item.sessionKey) + ':</strong> ' + tagText +
+        (body ? '<div class="remark-detail">' + body + '</div>' : '') + '</li>';
     }).join('') + '</ul>' : '<p class="muted">Chưa có nhận xét trong tháng này.</p>';
     return shell('<div class="section-head"><div><span class="nav-pair"><button type="button" class="btn" data-act="profile-back">← Thư viện</button>' + homeButton() + '</span>' +
       '<h2>Hồ sơ học viên</h2></div>' +
@@ -2448,7 +2487,60 @@
     if (canEdit()) return '';
     var list = classesWithNewRemarks();
     if (!list.length) return '';
-    return '<button type="button" class="remark-tag" data-act="nav" data-screen="remark-read">' + list.length + ' lớp được cập nhật nhận xét mới</button>';
+    return '<button type="button" class="remark-tag" data-act="nav" data-screen="remarks">' + list.length + ' lớp được cập nhật nhận xét mới</button>';
+  }
+
+  function remarkMonthKey() {
+    return /^\d{4}-\d{2}$/.test(ui.remarkMonth || '') ? ui.remarkMonth : L.monthKey(new Date());
+  }
+
+  function remarkInMonth(item, month) {
+    if (!item) return false;
+    if (String(item.sessionKey || '').indexOf(month) === 0) return true;
+    return String(item.at || '').indexOf(month) === 0;
+  }
+
+  function remarkSessionLabel(ses) {
+    if (!ses) return 'Buổi học';
+    if (!ses.date) return ses.label || ses.key || 'Buổi học';
+    var day = L.DAYS.filter(function (item) { return item.dow === ses.dow; })[0];
+    return L.formatDMY(ses.date) + ' · ' + (day ? day.short + ' ' : '') + L.formatTimeValue(ses.start) + '–' + L.formatTimeValue(ses.end);
+  }
+
+  function latestRemark(stu, sessionKey) {
+    var found = null;
+    (stu && stu.remarks || []).forEach(function (item) {
+      if (item && item.sessionKey === sessionKey) found = item;
+    });
+    return found;
+  }
+
+  function remarkSessions(cls, month) {
+    var list = L.monthSessions(cls, month).map(function (ses) { return ses; });
+    var have = {};
+    list.forEach(function (ses) { if (ses && ses.key) have[ses.key] = true; });
+    (cls.students || []).forEach(function (stu) {
+      (stu && stu.remarks || []).forEach(function (item) {
+        if (!remarkInMonth(item, month) || !item.sessionKey || have[item.sessionKey]) return;
+        have[item.sessionKey] = true;
+        list.push({ key: item.sessionKey, label: item.sessionLabel || item.sessionKey });
+      });
+    });
+    return list;
+  }
+
+  function remarkRoster(cls, sessionKey) {
+    var now = new Date();
+    var list = [];
+    (cls.students || []).forEach(function (stu) {
+      if (!stu) return;
+      var phase = L.studentPhase(cls, stu, now);
+      var has = (stu.remarks || []).some(function (item) { return item && item.sessionKey === sessionKey; });
+      if (phase.kind === 'archive' && !has) return;
+      list.push(stu);
+    });
+    list.sort(function (a, b) { return String(a.name || '').localeCompare(String(b.name || ''), 'vi'); });
+    return list;
   }
 
   function readRemarkDom() {
@@ -2467,44 +2559,281 @@
     if (bulk) draft.bulk = bulk.value;
   }
 
+  function remarkShown(item) {
+    if (!item || !item.id) return false;
+    return item.tag !== 'uncategorized';
+  }
+
+  function remarkDayKey(item) {
+    var raw = String(item && (item.sessionKey || item.at) || '').slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : '';
+  }
+
+  function remarkDayLabel(day) {
+    var parsed = day ? L.parseDateInput(day) : null;
+    return parsed ? L.formatDMY(parsed) : (day || 'Ngày khác');
+  }
+
+  function remarkNoteClass(cls, tagId) {
+    var group = String(classGroupId(cls) || 'custom').toLowerCase();
+    return 'remark-note remark-card group-' + esc(group) + ' tag-' + esc(tagId || 'plain');
+  }
+
+  function remarkEndsBr(html) {
+    return /<br>$/.test(html);
+  }
+
+  function remarkStyleWrap(el, inner) {
+    if (!inner) return '';
+    var style = String(el.getAttribute('style') || '').toLowerCase();
+    if (/font-weight\s*:\s*(bold|[6-9]00)/.test(style)) inner = '<b>' + inner + '</b>';
+    if (/font-style\s*:\s*italic/.test(style)) inner = '<i>' + inner + '</i>';
+    if (/text-decoration(?:-line)?\s*:[^;]*underline/.test(style)) inner = '<u>' + inner + '</u>';
+    return inner;
+  }
+
+  function remarkSanitize(raw) {
+    var host = document.createElement('div');
+    host.innerHTML = String(raw || '');
+    var blocks = { div: 1, p: 1, li: 1, tr: 1, h1: 1, h2: 1, h3: 1, h4: 1, h5: 1, h6: 1, blockquote: 1, pre: 1 };
+    function walk(node) {
+      var out = '';
+      var child = node.firstChild;
+      while (child) {
+        if (child.nodeType === 3) {
+          var parts = String(child.nodeValue || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+          for (var i = 0; i < parts.length; i++) {
+            if (i) out += '<br>';
+            out += esc(parts[i]);
+          }
+        } else if (child.nodeType === 1) {
+          var name = String(child.nodeName || '').toLowerCase();
+          if (name === 'br') out += '<br>';
+          else if (name === 'b' || name === 'strong') {
+            var bold = walk(child);
+            if (bold) out += '<b>' + bold + '</b>';
+          } else if (name === 'i' || name === 'em') {
+            var italic = walk(child);
+            if (italic) out += '<i>' + italic + '</i>';
+          } else if (name === 'u') {
+            var under = walk(child);
+            if (under) out += '<u>' + under + '</u>';
+          } else if (blocks[name]) {
+            var block = walk(child);
+            if (out && !remarkEndsBr(out)) out += '<br>';
+            if (!block) out += '<br>';
+            else {
+              out += block;
+              if (!remarkEndsBr(block)) out += '<br>';
+            }
+          } else if (name === 'span' || name === 'font') out += remarkStyleWrap(child, walk(child));
+          else out += walk(child);
+        }
+        child = child.nextSibling;
+      }
+      return out;
+    }
+    return walk(host).replace(/^(?:<br>)+/, '').replace(/(?:<br>)+$/, '');
+  }
+
+  function remarkToEditorHtml(text) {
+    var raw = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    if (!raw) return '';
+    if (/<[a-z!/]/i.test(raw)) return remarkSanitize(raw);
+    return esc(raw).replace(/\n/g, '<br>');
+  }
+
+  function remarkToPlain(text) {
+    var html = remarkToEditorHtml(text).replace(/<br>/g, '\n');
+    var box = document.createElement('div');
+    box.innerHTML = html;
+    return String(box.textContent || '').replace(/\u00a0/g, ' ').trim();
+  }
+
+  function remarkDetailHtml(text, tag) {
+    var html = remarkToEditorHtml(text);
+    if (!html && tag && tag.vi) html = esc(tag.vi);
+    if (!html) return '<p class="muted">Chưa có nhận xét.</p>';
+    return '<div class="remark-detail">' + html + '</div>';
+  }
+
+  function composerMarkup() {
+    var box = document.getElementById('remark-composer');
+    if (!box) return ui.remarkEditor ? String(ui.remarkEditor.text || '') : '';
+    return remarkSanitize(box.innerHTML);
+  }
+
+  function remarkSelInside(box) {
+    var sel = window.getSelection();
+    if (!box || !sel || !sel.rangeCount) return false;
+    var node = sel.anchorNode;
+    if (!node) return false;
+    return node === box || box.contains(node);
+  }
+
+  function remarkReadCard(cls, stu, item, seen) {
+    var tag = remarkTagInfo(item.tag);
+    var tagId = tag ? tag.id : 'plain';
+    var open = ui.remarkSlip === item.id;
+    var pill = tag ? '<span class="remark-pill tag-' + tag.id + '">' + esc(tag.en) + '<small>' + esc(tag.vi) + '</small></span>' : '';
+    var fresh = item.id && !seen[item.id] ? '<span class="remark-new">Mới</span>' : '';
+    var body = open
+      ? remarkDetailHtml(item.text, tag)
+      : '<p class="muted">Bấm để xem chi tiết.</p><button type="button" class="btn" data-act="remark-slip" data-id="' + esc(item.id) + '">Xem chi tiết</button>';
+    return '<article class="' + remarkNoteClass(cls, tagId) + '" data-remark="' + esc(item.id) + '"><strong>' + esc(showText(stu.name)) + '</strong>' +
+      (stu.englishName ? '<span>' + esc(stu.englishName) + '</span>' : '') +
+      '<span>Mã: ' + esc(showText(stu.code)) + '</span>' +
+      '<span>' + esc(item.sessionLabel || item.sessionKey || '') + '</span>' +
+      fresh + pill + body + '</article>';
+  }
+
+  function remarkEditCard(cls, stu, ses) {
+    var stored = latestRemark(stu, ses.key);
+    var tag = stored ? remarkTagInfo(stored.tag) : null;
+    var tagId = tag ? tag.id : (stored && stored.text ? 'plain' : 'uncategorized');
+    var label = remarkSessionLabel(ses);
+    var pill = tag ? '<span class="remark-pill tag-' + tag.id + '">' + esc(tag.en) + '<small>' + esc(tag.vi) + '</small></span>' : '';
+    var body = stored ? remarkDetailHtml(stored.text, tag) : '<p class="muted">Chưa có nhận xét.</p>';
+    return '<article class="' + remarkNoteClass(cls, tagId) + '" data-stu="' + esc(stu.id) + '"><strong>' + esc(showText(stu.name)) + '</strong>' +
+      (stu.englishName ? '<span>' + esc(stu.englishName) + '</span>' : '') +
+      '<span>Mã: ' + esc(showText(stu.code)) + '</span>' +
+      '<span>' + esc(label) + '</span>' + pill + body +
+      '<button type="button" class="btn remark-revise" data-act="remark-revise" data-class="' + esc(cls.id) + '" data-stu="' + esc(stu.id) + '" data-session="' + esc(ses.key) + '" data-label="' + esc(label) + '">Sửa</button></article>';
+  }
+
+  function remarkEditorHtml() {
+    var ed = ui.remarkEditor;
+    if (!ed || !canEdit()) return '';
+    var spec = remarkTagInfo(ed.tag) || remarkTagInfo('uncategorized');
+    var cls = findClass(ed.classId);
+    var stu = null;
+    if (cls) (cls.students || []).forEach(function (item) { if (item && item.id === ed.stuId) stu = item; });
+    var chips = REMARK_TAGS.map(function (item) {
+      var on = item.id === spec.id ? ' is-on' : '';
+      return '<button type="button" class="remark-chip tag-' + item.id + on + '" data-act="remark-pick" data-tag="' + item.id + '">' +
+        esc(item.en) + '<small>' + esc(item.vi) + '</small></button>';
+    }).join('');
+    var editable = spec.comment ? 'true' : 'false';
+    var lock = spec.comment ? '' : ' disabled';
+    var html = remarkToEditorHtml(ed.text);
+    var who = stu
+      ? '<p><strong>' + esc(showText(stu.name)) + '</strong>' +
+        (stu.englishName ? ' · ' + esc(stu.englishName) : '') +
+        ' · Mã: ' + esc(showText(stu.code)) + '</p>'
+      : '';
+    return '<div class="scrim remark-scrim"><div class="modal remark-editor" data-stop data-scroll-keep="remark-editor" role="dialog" aria-label="Sửa nhận xét">' +
+      '<div class="dialog-head"><h2>Sửa nhận xét</h2><button type="button" class="icon-x" data-act="remark-revise-close" aria-label="Đóng">X</button></div>' +
+      who +
+      '<p>' + esc(ed.label || '') + '</p>' +
+      '<div class="remark-chips">' + chips + '</div>' +
+      '<div class="remark-tools">' +
+        '<button type="button" class="btn remark-italic" data-act="remark-style" data-style="italic"' + lock + '>I</button>' +
+        '<button type="button" class="btn remark-bold" data-act="remark-style" data-style="bold"' + lock + '>B</button>' +
+        '<button type="button" class="btn remark-under" data-act="remark-style" data-style="underline"' + lock + '>U</button>' +
+      '</div>' +
+      '<p class="help">Bôi đen chữ, rồi bấm I, B, U hoặc Ctrl+I, Ctrl+B, Ctrl+U. Enter để xuống dòng.</p>' +
+      '<div id="remark-composer" class="remark-detail remark-composer" data-scroll-keep="remark-composer" contenteditable="' + editable + '" role="textbox" aria-multiline="true"' +
+        (spec.comment ? '' : ' aria-disabled="true"') + '>' + html + '</div>' +
+      '<div class="modal-foot"><button type="button" class="btn btn-primary" data-act="remark-save">Lưu thẻ</button>' +
+      '<button type="button" class="btn" data-act="remark-revise-close">Hủy</button></div></div></div>';
+  }
+
+  function remarkDays(cls, month) {
+    var map = {};
+    var order = [];
+    (cls.students || []).forEach(function (stu) {
+      (stu && stu.remarks || []).forEach(function (item) {
+        if (!remarkShown(item) || !remarkInMonth(item, month)) return;
+        var day = remarkDayKey(item) || 'other';
+        if (!map[day]) {
+          map[day] = [];
+          order.push(day);
+        }
+        map[day].push({ stu: stu, item: item });
+      });
+    });
+    order.sort();
+    return order.map(function (day) {
+      var cards = map[day].slice().sort(function (a, b) {
+        return String(a.stu.name || '').localeCompare(String(b.stu.name || ''), 'vi');
+      });
+      return { day: day, cards: cards };
+    });
+  }
+
+  function remarkLegendHtml() {
+    return '<section class="remark-admin"><h3>Khung nhận xét</h3><p class="help">Mỗi học viên một thẻ ghi chú. Bấm Sửa, chọn thẻ, rồi Lưu thẻ. Cửa sổ hiện đủ nhận xét, giữ cách dòng và xuống dòng. Bôi đen chữ rồi bấm I, B, U hoặc Ctrl+I, Ctrl+B, Ctrl+U. Absent và Uncategorized không nhập được nhận xét.</p><div class="remark-legend">' +
+      REMARK_TAGS.map(function (item) {
+        return '<span class="remark-pill tag-' + item.id + '">' + esc(item.en) + '<small>' + esc(item.vi) + '</small></span>';
+      }).join('') + '</div></section>';
+  }
+
+  function viewRemarkEditor(cls) {
+    var month = remarkMonthKey();
+    ui.remarkMonth = month;
+    var sessions = remarkSessions(cls, month);
+    if (!ui.remarkSession || !sessions.some(function (ses) { return ses.key === ui.remarkSession; })) {
+      ui.remarkSession = sessions.length ? sessions[0].key : '';
+    }
+    var current = null;
+    sessions.forEach(function (ses) { if (ses.key === ui.remarkSession) current = ses; });
+    var options = sessions.map(function (ses) {
+      return '<option value="' + esc(ses.key) + '"' + (ses.key === ui.remarkSession ? ' selected' : '') + '>' + esc(remarkSessionLabel(ses)) + '</option>';
+    }).join('');
+    var cards = current ? remarkRoster(cls, current.key).map(function (stu) { return remarkEditCard(cls, stu, current); }).join('') : '';
+    var roster = sessions.length
+      ? '<details class="remark-roster" open><summary>Danh sách học viên · ' + remarkRoster(cls, current.key).length + '</summary><div class="remark-note-scroll" data-scroll-keep="remark-roster"><div class="remark-note-grid">' +
+        (cards || '<p class="muted">Chưa có học viên.</p>') + '</div></div></details>'
+      : '<p class="muted">Lớp không có buổi học trong tháng này.</p>';
+    return shell('<div class="section-head"><div><span class="nav-pair"><button type="button" class="btn" data-act="remark-back">← Danh sách lớp</button>' + homeButton() + '</span><h2>' + esc(L.currentName(cls)) + '</h2></div></div>' +
+      '<label class="field dash-month"><span>Tháng</span><input id="remark-month" type="month" value="' + esc(month) + '"></label>' +
+      '<label class="field"><span>Buổi nhận xét</span><select id="remark-session-pick">' + options + '</select></label>' +
+      '<p class="help">Thẻ học viên theo buổi đang chọn. Bấm Sửa để mở cửa sổ và xem đủ nhận xét. Đổi buổi trong ô phía trên. Ngăn rút gọn chỉ gồm danh sách học viên.</p>' +
+      remarkLegendHtml() +
+      fileExportButtons('export-remarks') +
+      (canExportClasses() ? '<p class="help">Xuất nhận xét đã lưu của lớp này.</p>' : '') +
+      roster) + remarkEditorHtml();
+  }
+
+  function viewRemarkReader() {
+    var month = remarkMonthKey();
+    ui.remarkMonth = month;
+    var acc = currentAccount();
+    var seen = acc && acc.remarkSeen ? acc.remarkSeen : {};
+    var blocks = (state.classes || []).slice().sort(function (a, b) {
+      return L.currentName(a).localeCompare(L.currentName(b), 'vi');
+    }).map(function (cls) {
+      var days = remarkDays(cls, month);
+      if (!days.length) return '';
+      var count = 0;
+      days.forEach(function (bucket) { count += bucket.cards.length; });
+      var group = String(classGroupId(cls) || 'custom').toLowerCase();
+      var open = ui.remarkOpenClass === cls.id;
+      var inner = open ? '<div class="remark-fold-body" data-scroll-keep="remark-days">' + days.map(function (bucket) {
+        return '<section class="remark-day" data-day="' + esc(bucket.day) + '"><h3>' + esc(remarkDayLabel(bucket.day)) + '</h3><div class="remark-note-grid">' +
+          bucket.cards.map(function (row) { return remarkReadCard(cls, row.stu, row.item, seen); }).join('') + '</div></section>';
+      }).join('') + '</div>' : '';
+      return '<details class="remark-fold" data-class="' + esc(cls.id) + '"' + (open ? ' open' : '') + '><summary><span class="remark-note remark-class-note group-' + esc(group) + '"><strong>' +
+        esc(L.currentName(cls)) + '</strong><span>' + count + ' nhận xét · ' + days.length + ' ngày</span></span></summary>' + inner + '</details>';
+    }).join('');
+    return shell('<div class="section-head"><div><span class="nav-pair"><button type="button" class="btn" data-act="nav" data-screen="menu">← Menu</button>' + homeButton() + '</span><h2>Nhận xét học viên</h2></div></div>' +
+      '<label class="field dash-month"><span>Tháng</span><input id="remark-month" type="month" value="' + esc(month) + '"></label>' +
+      '<p class="help">Mỗi lớp là một thẻ ghi chú thu gọn. Bấm lớp để xem theo ngày. Thẻ Chưa nhận xét không hiện.</p>' +
+      fileExportButtons('export-remarks') +
+      (canExportClasses() ? '<p class="help">Mở một lớp rồi xuất nhận xét chưa xem của lớp đó.</p>' : '') +
+      '<div class="remark-board" data-scroll-keep="remark-board">' + (blocks || '<p class="muted">Chưa có nhận xét trong tháng này.</p>') + '</div>');
+  }
+
   function viewRemarks() {
-    if (!canEdit()) return viewRemarkRead();
+    if (!canEdit()) return viewRemarkReader();
     if (!ui.remarkClassId) {
       return shell('<div class="section-head"><div><span class="nav-pair"><button type="button" class="btn" data-act="nav" data-screen="menu">← Menu</button>' + homeButton() + '</span><h2>Nhận xét học viên</h2></div></div>' +
-        '<p class="help">Chọn một lớp, rồi nhận xét theo buổi học. Có thể chọn một hoặc nhiều học viên để ghi cùng một nội dung.</p>' +
+        '<p class="help">Chọn một lớp trong thư mục, rồi nhận xét theo buổi.</p>' +
         classBrowser('remarks'));
     }
     var cls = findClass(ui.remarkClassId);
-    if (!cls) { ui.remarkClassId = ''; ui.remarkDraft = null; return viewRemarks(); }
-    if (!ui.remarkDraft || ui.remarkDraft.classId !== cls.id) {
-      ui.remarkDraft = { classId: cls.id, sessionKey: '', texts: {}, ticks: {}, editing: false, bulk: '' };
-    }
-    var draft = ui.remarkDraft;
-    var sessions = classSessionChoices(cls);
-    var options = sessions.map(function (ses) {
-      var day = L.DAYS.filter(function (item) { return item.dow === ses.dow; })[0];
-      var label = L.formatDMY(ses.date) + ' · ' + (day ? day.short + ' ' : '') + L.formatTimeValue(ses.start) + '–' + L.formatTimeValue(ses.end);
-      var value = ses.key;
-      return '<option value="' + esc(value) + '" data-label="' + esc(label) + '"' + (draft.sessionKey === value ? ' selected' : '') + '>' + esc(label) + '</option>';
-    }).join('');
-    var rows = (cls.students || []).map(function (stu) {
-      var text = draft.texts[stu.id] || '';
-      return '<tr><td><input type="checkbox" data-remark-tick="' + esc(stu.id) + '"' + (draft.ticks[stu.id] ? ' checked' : '') + ' aria-label="Chọn ' + esc(stu.name) + '"></td>' +
-        '<td>' + esc(showText(stu.name)) + '</td><td>' + esc(showText(stu.code)) + '</td>' +
-        '<td><textarea data-remark-text="' + esc(stu.id) + '"' + (draft.editing ? '' : ' readonly') + '>' + esc(text) + '</textarea></td></tr>';
-    }).join('');
-    return shell('<div class="section-head"><div><span class="nav-pair"><button type="button" class="btn" data-act="remark-back">← Danh sách lớp</button>' + homeButton() + '</span><h2>' + esc(L.currentName(cls)) + '</h2></div></div>' +
-      '<label class="field"><span>Buổi học</span><select id="remark-session"><option value="">Chọn buổi</option>' + options + '</select></label>' +
-      '<label class="field"><span>Nội dung hàng loạt</span><textarea id="remark-bulk">' + esc(draft.bulk || '') + '</textarea></label>' +
-      '<div class="btn-row"><button type="button" class="btn btn-primary" data-act="remark-confirm">Xác nhận</button>' +
-      '<button type="button" class="btn" data-act="remark-edit">Sửa</button>' +
-      '<button type="button" class="btn btn-primary" data-act="remark-done">Xong</button>' +
-      '<button type="button" class="btn" data-act="remark-cancel">Hủy</button></div>' +
-      fileExportButtons('export-remarks') +
-      '<p class="help">Chọn học viên, viết nội dung, rồi bấm Xác nhận để điền vào các ô đã chọn. Sửa để chỉnh từng ô. Xong để lưu theo buổi đã chọn. Hủy bỏ toàn bộ nội dung vừa viết.</p>' +
-      (canExportClasses() ? '<p class="help">Xuất các nhận xét đã lưu của lớp này. Nội dung đang viết chưa bấm Xong không nằm trong file.</p>' : '') +
-      '<div class="table-wrap"><table><thead><tr><th></th><th>Học viên</th><th>Mã học viên</th><th>Nội dung</th></tr></thead><tbody>' +
-      (rows || '<tr><td colspan="4">Chưa có học viên.</td></tr>') + '</tbody></table></div>');
+    if (!cls) { ui.remarkClassId = ''; ui.remarkSession = ''; return viewRemarks(); }
+    return viewRemarkEditor(cls);
   }
 
   function confirmRemarkBulk() {
@@ -2545,52 +2874,70 @@
   }
 
   function viewRemarkRead() {
-    var list = classesWithNewRemarks();
-    if (!ui.remarkReadId) {
-      var cards = list.length ? list.map(function (item) {
-        return '<button type="button" class="folder group-' + esc(String(classGroupId(item.cls)).toLowerCase()) + '" data-act="remark-open" data-id="' + esc(item.cls.id) + '"><strong>' + esc(L.currentName(item.cls)) + '</strong><span>' + item.count + ' nhận xét mới</span></button>';
-      }).join('') : '<p class="muted">Chưa có nhận xét mới.</p>';
-      return shell('<div class="section-head"><div><span class="nav-pair"><button type="button" class="btn" data-act="nav" data-screen="menu">← Menu</button>' + homeButton() + '</span><h2>Nhận xét mới</h2></div></div>' +
-        '<p class="help">Lớp còn thông báo cho đến khi từng học viên có nhận xét mới được mở xem chi tiết.</p><div class="folder-grid">' + cards + '</div>');
-    }
-    var cls = findClass(ui.remarkReadId);
-    if (!cls) { ui.remarkReadId = ''; return viewRemarkRead(); }
-    var acc = currentAccount();
-    var seen = acc && acc.remarkSeen ? acc.remarkSeen : {};
-    var slips = (cls.students || []).filter(function (stu) {
-      return (stu.remarks || []).some(function (item) { return item && item.id && !seen[item.id]; });
-    }).map(function (stu) {
-      var open = ui.remarkSlip === stu.id;
-      var items = (stu.remarks || []).filter(function (item) { return item && item.id && !seen[item.id]; });
-      var body = open ? items.map(function (item) {
-        return '<p><b>' + esc(item.sessionLabel || item.sessionKey) + '</b></p><p>' + esc(item.text) + '</p>';
-      }).join('') : '<p class="muted">Bấm để xem chi tiết.</p>';
-      return '<article class="remark-slip"><header><strong>' + esc(showText(stu.name)) + '</strong><span>' + esc(showText(stu.code)) + '</span><span class="remark-new">Mới</span></header>' +
-        body + (open ? '' : '<button type="button" class="btn" data-act="remark-slip" data-id="' + esc(stu.id) + '">Xem chi tiết</button>') + '</article>';
-    }).join('');
-    return shell('<div class="section-head"><div><span class="nav-pair"><button type="button" class="btn" data-act="remark-read-back">← Các lớp</button>' + homeButton() + '</span><h2>' + esc(L.currentName(cls)) + '</h2></div></div>' +
-      fileExportButtons('export-remarks') +
-      (canExportClasses() ? '<p class="help">Xuất các nhận xét mới chưa xem của lớp này.</p>' : '') +
-      '<div class="remark-sheet">' + (slips || '<p class="muted">Lớp này không còn nhận xét mới.</p>') + '</div>');
+    return viewRemarks();
   }
 
-  function markRemarkSlip(stuId) {
+  function markRemarkSlip(remarkId) {
     var acc = currentAccount();
-    var cls = findClass(ui.remarkReadId);
-    if (!acc || !cls) return;
+    if (!acc || !remarkId) return;
     if (!acc.remarkSeen || typeof acc.remarkSeen !== 'object') acc.remarkSeen = {};
-    (cls.students || []).forEach(function (stu) {
-      if (stu.id !== stuId) return;
-      (stu.remarks || []).forEach(function (item) { if (item && item.id) acc.remarkSeen[item.id] = true; });
-    });
-    ui.remarkSlip = stuId;
-    save();
+    acc.remarkSeen[remarkId] = true;
+    ui.remarkSlip = remarkId;
+    save({ quiet: true });
+    render();
+  }
+
+  function saveRemarkCard(btn) {
+    if (deny(canEdit())) return;
+    var ed = ui.remarkEditor;
+    if (!ed) return;
+    var classId = ed.classId || '';
+    var stuId = ed.stuId || '';
+    var sessionKey = ed.sessionKey || '';
+    var label = ed.label || sessionKey;
+    var cls = findClass(classId);
+    var stu = null;
+    if (cls) (cls.students || []).forEach(function (item) { if (item && item.id === stuId) stu = item; });
+    if (!cls || !stu || !sessionKey) return;
+    var on = document.querySelector('.remark-editor .remark-chip.is-on');
+    var tagId = on ? on.getAttribute('data-tag') : (ed.tag || 'uncategorized');
+    var spec = remarkTagInfo(tagId) || remarkTagInfo('uncategorized');
+    var markup = composerMarkup();
+    var text = spec.comment ? markup : '';
+    if (spec.comment && !remarkToPlain(text)) { toast('Viết nhận xét trước khi lưu.'); return; }
+    if (!Array.isArray(stu.remarks)) stu.remarks = [];
+    if (spec.id === 'uncategorized') {
+      stu.remarks = stu.remarks.filter(function (item) { return !item || item.sessionKey !== sessionKey; });
+    } else {
+      var current = latestRemark(stu, sessionKey);
+      if (current) {
+        current.tag = spec.id;
+        current.text = text;
+        current.sessionLabel = label;
+        current.at = new Date().toISOString();
+        current.by = ui.user ? ui.user.name : '';
+      } else {
+        stu.remarks.push({
+          id: L.uid(),
+          sessionKey: sessionKey,
+          sessionLabel: label,
+          text: text,
+          tag: spec.id,
+          at: new Date().toISOString(),
+          by: ui.user ? ui.user.name : ''
+        });
+      }
+    }
+    ui.remarkDraft = null;
+    ui.remarkEditor = null;
+    save({ quiet: true });
+    toast('Đã lưu nhận xét.');
     render();
   }
 
   function viewMenu() {
     var stats = currentWeekStats(null);
-    var menuSpan = canEdit() ? 'A–L' : 'A–K';
+    var menuSpan = 'A–L';
     return shell(remarkTagHtml() + summaryHtml(stats) + dashboardHtml() +
       '<details class="menu-fold"><summary>Menu chính ' + menuSpan + '</summary><section class="menu-grid">' +
       '<button type="button" class="menu-card" data-act="nav" data-screen="classes">' + iconClass() +
@@ -2614,7 +2961,7 @@
       '<p>Giáo trình, mua sách và tài khoản PEC.</p></button>' +
       '<button type="button" class="menu-card" data-act="nav" data-screen="exam">' + iconExam() +
       '<div class="kicker">G · EXAM</div><h2>Kỳ thi</h2>' +
-      '<p>Chọn ngày trên lịch tháng, xem lịch thi theo tuần.</p></button>' +
+      '<p>Lọc lịch thi theo FET, cấp độ và chương trình.</p></button>' +
       '<button type="button" class="menu-card" data-act="nav" data-screen="staff">' + iconStaff() +
       '<div class="kicker">H · TEACHER HOURS</div><h2>Công giáo viên</h2>' +
       '<p>Giờ Teaching và giờ SOA của từng FET.</p></button>' +
@@ -2628,9 +2975,9 @@
       '<button type="button" class="menu-card" data-act="nav" data-screen="care">' + iconCare() +
       '<div class="kicker">K · STUDENT CARE</div><h2>Chăm sóc học viên</h2>' +
       '<p>Tương tác theo tuần trong tháng và mức hiệu quả.</p></button>' +
-      (canEdit() ? '<button type="button" class="menu-card" data-act="nav" data-screen="remarks">' + iconRemark() +
+      '<button type="button" class="menu-card" data-act="nav" data-screen="remarks">' + iconRemark() +
       '<div class="kicker">L · REMARKS</div><h2>Nhận xét học viên</h2>' +
-      '<p>Nhận xét theo buổi, một người hoặc hàng loạt.</p></button>' : '') +
+      '<p>Thư mục lớp, sửa nhận xét trong cửa sổ nhỏ.</p></button>' +
       '</section></details>');
   }
 
@@ -3334,6 +3681,126 @@
     return { iso: iso, start: '', end: '', dow: day ? day.getDay() : '' };
   }
 
+  function examFilterState() {
+    var src = ui.examFilter || {};
+    return { fet: src.fet || '', grade: src.grade || '', program: src.program || '' };
+  }
+
+  function examFilterOn() {
+    var filter = examFilterState();
+    return !!(filter.fet || filter.grade || filter.program);
+  }
+
+  function examNameHit(value, needle) {
+    if (!needle) return true;
+    if (value === needle) return true;
+    var parts = String(value || '').split(',');
+    for (var i = 0; i < parts.length; i++) {
+      if (parts[i].trim() === needle) return true;
+    }
+    return false;
+  }
+
+  function examProgramOf(cls) {
+    if (!cls) return '';
+    var level = L.currentLevel(cls);
+    var grade = level ? L.gradeById(level.gradeId) : L.gradeById(cls.gradeId);
+    return L.trackLabel(cls, grade) || 'Custom';
+  }
+
+  function examGradeKey(cls) {
+    if (!cls) return '';
+    var level = L.currentLevel(cls);
+    var gradeId = (level && level.gradeId) || cls.gradeId || '';
+    if (gradeId && L.gradeById(gradeId)) return gradeId;
+    if (cls.customLevel) return 'custom:' + String(cls.customLevel);
+    return '';
+  }
+
+  function examGradeLabel(key) {
+    if (!key) return 'Chưa rõ cấp độ';
+    if (String(key).indexOf('custom:') === 0) return String(key).slice(7);
+    var grade = L.gradeById(key);
+    return grade ? grade.label : String(key);
+  }
+
+  function examFilterSelect(label, key, options, value) {
+    return '<label class="field filter-field"><span>' + esc(label) + '</span><select data-exam-filter="' + esc(key) + '"><option value="">Tất cả</option>' +
+      options.map(function (item) {
+        return '<option value="' + esc(item.id) + '"' + (item.id === value ? ' selected' : '') + '>' + esc(item.label) + '</option>';
+      }).join('') + '</select></label>';
+  }
+
+  function examFilterBar(exam) {
+    var filter = examFilterState();
+    var fetSeen = {};
+    var fetList = [];
+    function addFet(name) {
+      String(name || '').split(',').forEach(function (part) {
+        var text = part.trim();
+        if (!text || text === '?' || text === '-' || fetSeen[text]) return;
+        fetSeen[text] = true;
+        fetList.push(text);
+      });
+    }
+    (L.FET || []).forEach(addFet);
+    var gradeMap = {};
+    var programMap = {};
+    (exam.entries || []).forEach(function (entry) {
+      var cls = findClass(entry.classId);
+      L.classFetNames(cls).forEach(addFet);
+      var gradeKey = examGradeKey(cls);
+      if (gradeKey) gradeMap[gradeKey] = examGradeLabel(gradeKey);
+      var program = examProgramOf(cls);
+      if (program) programMap[program] = program;
+    });
+    if (filter.fet) addFet(filter.fet);
+    if (filter.grade && !gradeMap[filter.grade]) gradeMap[filter.grade] = examGradeLabel(filter.grade);
+    if (filter.program) programMap[filter.program] = filter.program;
+    var grades = Object.keys(gradeMap).sort(function (a, b) {
+      return L.gradeIndex(a) - L.gradeIndex(b) || String(gradeMap[a]).localeCompare(String(gradeMap[b]), 'vi');
+    }).map(function (id) { return { id: id, label: gradeMap[id] }; });
+    var programOrder = ['KINDY', 'KIDS', 'TEENS', 'IELTS', 'Custom'];
+    var programs = programOrder.filter(function (id) { return programMap[id]; }).map(function (id) { return { id: id, label: id }; });
+    Object.keys(programMap).sort(function (a, b) { return a.localeCompare(b, 'vi'); }).forEach(function (id) {
+      if (programOrder.indexOf(id) < 0) programs.push({ id: id, label: id });
+    });
+    return '<div class="filter-bar exam-filter">' +
+      examFilterSelect('Giáo viên FET', 'fet', fetList.map(function (name) { return { id: name, label: name }; }), filter.fet) +
+      examFilterSelect('Cấp độ', 'grade', grades, filter.grade) +
+      examFilterSelect('Chương trình', 'program', programs, filter.program) +
+      '<button type="button" class="btn" data-act="exam-clear-filter">Bỏ lọc</button></div>' +
+      '<p class="help">Lọc lịch thi theo giáo viên FET của buổi, cấp độ đang học và chương trình. Chương trình TEENS vẫn gồm lớp đã lên thang IELTS. Số lớp trong ngày chỉ tính các lớp đang hiện.</p>';
+  }
+
+  function examWeekDates(entry, mondayIso) {
+    var dates = examDateList(entry);
+    if (!mondayIso) return dates;
+    var start = L.parseDateInput(mondayIso);
+    if (!start) return [];
+    var from = start.getTime();
+    var end = L.addDays(start, 7).getTime();
+    return dates.filter(function (iso) {
+      var day = L.parseDateInput(iso);
+      return day && day.getTime() >= from && day.getTime() < end;
+    });
+  }
+
+  function examEntryMatches(entry, mondayIso, filter) {
+    var cls = findClass(entry && entry.classId);
+    if (filter.program && examProgramOf(cls) !== filter.program) return false;
+    if (filter.grade && examGradeKey(cls) !== filter.grade) return false;
+    var dates = examWeekDates(entry, mondayIso);
+    if (!dates.length) return false;
+    if (!filter.fet) return true;
+    for (var i = 0; i < dates.length; i++) {
+      var ses = examSessionOn(entry, dates[i]);
+      var fet = cls ? L.sessionFetOf(cls, dates[i], ses.start || '') : '';
+      if (examNameHit(fet, filter.fet)) return true;
+    }
+    return false;
+  }
+
   function examWeekBoard(exam, mondayIso) {
     var start = L.parseDateInput(mondayIso);
     if (!start) return '';
@@ -3359,9 +3826,19 @@
           name: entry.className || (cls ? L.currentName(cls) : 'Lớp'),
           tag: tag,
           group: String(classGroupId(cls) || 'custom').toLowerCase(),
-          classId: entry.classId
+          classId: entry.classId,
+          fet: cls ? L.sessionFetOf(cls, item.iso, ses.start || '') : '',
+          grade: examGradeKey(cls),
+          program: examProgramOf(cls)
         });
       });
+    });
+    var examFilter = examFilterState();
+    chips = chips.filter(function (chip) {
+      if (examFilter.program && chip.program !== examFilter.program) return false;
+      if (examFilter.grade && chip.grade !== examFilter.grade) return false;
+      if (examFilter.fet && !examNameHit(chip.fet, examFilter.fet)) return false;
+      return true;
     });
     function minutesOfText(value) {
       var bits = String(value || '0:0').split(':');
@@ -3393,7 +3870,7 @@
         return '<tr><th class="time-cell">' + time + '</th>' + dayMeta.map(function (item) {
           var cards = (row.cells[item.day.dow] || []).filter(function (chip) { return chip.iso === item.iso; }).map(function (chip) {
             var tag = chip.tag ? '<small class="tt-tag">' + esc(chip.tag) + '</small>' : '';
-            return '<div class="tt-card tt-exam group-' + esc(chip.group) + '"><strong>' + esc(chip.name) + '</strong>' + tag + '</div>';
+            return '<div class="tt-card tt-exam group-' + esc(chip.group) + '" data-exam-class="' + esc(chip.classId) + '" data-exam-iso="' + esc(chip.iso) + '" data-exam-dow="' + esc(chip.dow) + '" data-exam-fet="' + esc(chip.fet) + '" data-exam-grade="' + esc(chip.grade) + '" data-exam-program="' + esc(chip.program) + '"><strong>' + esc(chip.name) + '</strong>' + tag + '</div>';
           }).join('');
           return '<td>' + cards + '</td>';
         }).join('') + '</tr>';
@@ -3405,7 +3882,7 @@
       body += '<tr class="gap-row"><td colspan="8">Chưa rõ giờ</td></tr><tr><th class="time-cell">—</th>' + dayMeta.map(function (item) {
         var cards = loose.filter(function (chip) { return chip.iso === item.iso; }).map(function (chip) {
           var tag = chip.tag ? '<small class="tt-tag">' + esc(chip.tag) + '</small>' : '';
-          return '<div class="tt-card tt-exam group-' + esc(chip.group) + '"><strong>' + esc(chip.name) + '</strong>' + tag + '</div>';
+          return '<div class="tt-card tt-exam group-' + esc(chip.group) + '" data-exam-class="' + esc(chip.classId) + '" data-exam-iso="' + esc(chip.iso) + '" data-exam-dow="' + esc(chip.dow) + '" data-exam-fet="' + esc(chip.fet) + '" data-exam-grade="' + esc(chip.grade) + '" data-exam-program="' + esc(chip.program) + '"><strong>' + esc(chip.name) + '</strong>' + tag + '</div>';
         }).join('');
         return '<td>' + cards + '</td>';
       }).join('') + '</tr>';
@@ -3439,12 +3916,15 @@
       age = '<p class="meta">Thời hạn: ' + esc(fromText) + ' – ' + esc(toText) + '</p>';
     }
     var typeLabel = exam.type === 'pick' ? 'Chọn lọc' : (exam.type === 'biannual' ? 'BI-ANNUAL' : 'Theo lớp');
+    var filter = examFilterState();
     var chips = weeks.length ? '<div class="week-picks">' + weeks.map(function (iso) {
       var on = iso === week ? ' is-on' : '';
       return '<button type="button" class="btn' + on + '" data-act="exam-week" data-week="' + esc(iso) + '">Tuần ' + esc(L.formatDMY(L.parseDateInput(iso))) + '</button>';
-    }).join('') + '</div>' + examWeekBoard(exam, week) : '<p class="help">Chưa có ngày thi.</p>';
+    }).join('') + '</div>' + examFilterBar(exam) + examWeekBoard(exam, week) : '<p class="help">Chưa có ngày thi.</p>';
     var shown = (exam.entries || []).filter(function (entry) {
-      return week ? entryTouchesWeek(entry, week) : true;
+      if (week && !entryTouchesWeek(entry, week)) return false;
+      if (week && examFilterOn() && !examEntryMatches(entry, week, filter)) return false;
+      return true;
     });
     var cards = shown.map(function (entry) {
       var dates = examDateList(entry).map(function (iso) {
@@ -3463,10 +3943,10 @@
         students.length + ' học viên' + (outCount ? ' · ' + outCount + ' không thi' : '') + ' · ' + esc(dates || 'Chưa có ngày') + '</span></summary>' +
         '<p class="meta">' + esc(slotLabel(entry.slotDow, entry.slotStart, entry.slotEnd)) + '</p>' +
         examStudentRows(exam, entry) + extra + '</details>';
-    }).join('');
+    }).join('') || (week && examFilterOn() ? '<p class="muted">Không có lớp khớp bộ lọc.</p>' : '');
     return shell('<div class="section-head"><div><span class="nav-pair"><button type="button" class="btn" data-act="exam-list">← Kỳ thi</button>' + homeButton() + '</span>' +
       '<h2>' + esc(exam.name) + '</h2><p class="meta">' + typeLabel + '</p>' + age + '</div></div>' +
-      '<p class="help">Lịch trong thư mục xếp theo buổi sáng, trưa, chiều và tối. Thẻ là lớp có buổi thi trong ngày. Danh sách điểm nằm gọn bên dưới, bấm tên lớp để mở.</p>' +
+      '<p class="help">Lịch trong thư mục xếp theo buổi sáng, trưa, chiều và tối. Lọc theo giáo viên FET, cấp độ và chương trình. Thẻ là lớp có buổi thi trong ngày. Danh sách điểm nằm gọn bên dưới, bấm tên lớp để mở.</p>' +
       (canEdit() ? '<div class="btn-row"><button type="button" class="btn" data-act="exam-edit">Sửa lớp và lịch thi</button></div>' : '<p class="help">Tài khoản này chỉ xem điểm và đánh giá.</p>') +
       chips + cards);
   }
@@ -6414,9 +6894,59 @@
       body + dictSentenceHtml(d));
   }
 
+  function viewScrollKey() {
+    return [
+      ui.screen || '',
+      ui.classId || '',
+      ui.remarkClassId || '',
+      ui.remarkSession || '',
+      ui.remarkMonth || '',
+      ui.careClassId || '',
+      ui.careMonth || '',
+      ui.curriculumId || '',
+      ui.curriculumMonth || '',
+      ui.examId || '',
+      ui.examWeek || '',
+      ui.profileId || '',
+      ui.profileMonth || '',
+      ui.archiveFolder || '',
+      ui.peopleKey || '',
+      ui.hwMonth || '',
+      ui.staffMonth || '',
+      ui.boardMonth || ''
+    ].join('|');
+  }
+
+  function readScrollShot() {
+    var boxes = {};
+    document.querySelectorAll('[data-scroll-keep]').forEach(function (el) {
+      var id = el.getAttribute('data-scroll-keep');
+      if (!id) return;
+      boxes[id] = { top: el.scrollTop || 0, left: el.scrollLeft || 0 };
+    });
+    return {
+      x: window.pageXOffset || document.documentElement.scrollLeft || 0,
+      y: window.pageYOffset || document.documentElement.scrollTop || 0,
+      boxes: boxes
+    };
+  }
+
+  function writeScrollShot(shot) {
+    if (!shot) return;
+    window.scrollTo(shot.x || 0, shot.y || 0);
+    document.querySelectorAll('[data-scroll-keep]').forEach(function (el) {
+      var saved = shot.boxes[el.getAttribute('data-scroll-keep')];
+      if (!saved) return;
+      el.scrollTop = saved.top;
+      el.scrollLeft = saved.left;
+    });
+  }
+
   function render() {
     var root = document.getElementById('app');
     var html = '';
+    var nextKey = '';
+    var shot = null;
     try {
       if (ui.user && ui.screen !== 'login') sweepRoster();
       if (!ui.user || ui.screen === 'login') html = viewLogin();
@@ -6439,10 +6969,14 @@
       else if (ui.screen === 'remarks') html = viewRemarks();
       else if (ui.screen === 'remark-read') html = viewRemarkRead();
       else html = viewMenu();
+      nextKey = viewScrollKey();
+      shot = readScrollShot();
       root.innerHTML = html;
     } catch (err) {
       console.error(err);
       root.innerHTML = '<div class="wrap"><p>Không mở được giao diện. Tải lại trang.</p></div>';
+      shot = null;
+      scrollLatch.key = '';
     }
     paintTitles();
     paintClock();
@@ -6454,6 +6988,14 @@
     pinBars();
     hydratePhotos();
     bindPhotoZoom();
+    var sameScroll = !!(shot && nextKey && nextKey === scrollLatch.key);
+    if (sameScroll) writeScrollShot(shot);
+    if (nextKey) scrollLatch.key = nextKey;
+    var composer = document.getElementById('remark-composer');
+    if (composer && composer.getAttribute('contenteditable') === 'true') {
+      try { composer.focus({ preventScroll: true }); } catch (ignoreFocus) {}
+    }
+    if (sameScroll) writeScrollShot(shot);
     if (ui.screen === 'dictionary') {
       document.querySelectorAll('audio.dict-player').forEach(function (el) {
         el.addEventListener('error', function () {
@@ -7722,7 +8264,10 @@
     var rows = [];
     (cls.students || []).forEach(function (stu) {
       (stu.remarks || []).forEach(function (item) {
-        if (!item || !String(item.text || '').trim()) return;
+        if (!item) return;
+        var remarkText = remarkToPlain(item.text);
+        var remarkTag = remarkTagInfo(item.tag);
+        if (!remarkText && !(remarkTag && remarkTag.id === 'absent')) return;
         if (unseenOnly && item.id && seen[item.id]) return;
         rows.push({
           kind: 'data',
@@ -7730,7 +8275,8 @@
             showText(stu.name),
             showText(stu.code),
             showText(item.sessionLabel || item.sessionKey),
-            String(item.text || ''),
+            remarkTag ? remarkTag.en + ' · ' + remarkTag.vi : '—',
+            remarkText,
             showText(item.by),
             remarkWhen(item.at)
           ]
@@ -7744,7 +8290,7 @@
     return {
       title: state.settings.title,
       meta: [L.currentName(cls), unseenOnly ? 'Nhận xét chưa xem' : 'Nhận xét học viên'],
-      headers: ['Học viên', 'Mã', 'Buổi', 'Nội dung', 'Người ghi', 'Thời gian'],
+      headers: ['Học viên', 'Mã', 'Buổi', 'Thẻ', 'Nội dung', 'Người ghi', 'Thời gian'],
       rows: remarkExportRows(cls, unseenOnly),
       minCol: 72,
       maxCol: 280
@@ -7753,8 +8299,8 @@
 
   function exportRemarks(kind) {
     if (deny(canExportClasses())) return;
-    var cls = findClass(canEdit() ? ui.remarkClassId : ui.remarkReadId);
-    if (!cls) return;
+    var cls = findClass(ui.remarkOpenClass || ui.remarkClassId || ui.remarkReadId);
+    if (!cls) { toast('Mở một lớp trước khi xuất.'); return; }
     var spec = remarkSpec(cls, !canEdit());
     if (!spec.rows.length) { toast('Không có nhận xét để xuất.'); return; }
     exportSheet(spec, kind, 'OceanEDU_nhan_xet_' + L.currentName(cls));
@@ -8261,6 +8807,7 @@
     if (e.target.id === 'clockbox') document.getElementById('clockbox').classList.add('hidden');
     if (e.target.id === 'settingsbox') closeSettings();
     if (e.target.classList && e.target.classList.contains('scrim')) {
+      if (e.target.classList.contains('remark-scrim')) { ui.remarkEditor = null; render(); return; }
       if (ui.detailId && !ui.modal) { ui.detailId = null; ui.detailEdit = false; render(); releasePending(); return; }
       if (ui.modal) { ui.modal = null; ui.formError = ''; ui.importDraft = null; render(); releasePending(); }
       return;
@@ -8279,7 +8826,8 @@
       'edit-staff': 1, 'save-staff': 1,
       'people-add': 1, 'people-edit': 1, 'people-save': 1,
       'code-save': 1, 'care-save': 1, 'profile-save': 1, 'profile-edit': 1, 'photo-url': 1,
-      'remark-confirm': 1, 'remark-edit': 1, 'remark-done': 1, 'open-remarks': 1,
+      'remark-confirm': 1, 'remark-edit': 1, 'remark-done': 1, 'remark-pick': 1, 'remark-save': 1,
+      'remark-revise': 1, 'remark-style': 1, 'remark-revise-close': 1,
       'dup-transfer': 1, 'dup-skip': 1,
       'book-fold': 1, 'book-set': 1, 'book-message': 1, 'copy-report': 1, 'transfer-report-yes': 1,
       'past-book-open': 1, 'past-book-add': 1, 'past-book-remove': 1, 'past-book-save': 1, 'past-book-standard': 1, 'past-book-cancel': 1
@@ -8362,6 +8910,7 @@
       ui.user = null;
       ui.screen = 'login';
       ui.modal = null;
+      ui.remarkEditor = null;
       ui.detailId = null;
       ui.accountForm = null;
       closeSettings();
@@ -8483,13 +9032,68 @@
     if (act === 'profile-save') { saveProfile(); return; }
     if (act === 'photo-url') { pullPhotoLink(); return; }
     if (act === 'open-remarks') {
-      ui.remarkClassId = btn.getAttribute('data-id') || '';
+      ui.remarkOpenClass = btn.getAttribute('data-id') || '';
+      ui.remarkClassId = ui.remarkOpenClass;
+      ui.remarkSession = '';
       ui.remarkDraft = null;
+      ui.remarkEditor = null;
+      ui.remarkSlip = '';
       ui.screen = 'remarks';
       render();
       return;
     }
-    if (act === 'remark-back') { ui.remarkClassId = ''; ui.remarkDraft = null; render(); return; }
+    if (act === 'remark-revise') {
+      if (deny(canEdit())) return;
+      var revClass = btn.getAttribute('data-class') || '';
+      var revStu = btn.getAttribute('data-stu') || '';
+      var revSession = btn.getAttribute('data-session') || '';
+      var revHost = findClass(revClass);
+      var revWho = null;
+      if (revHost) (revHost.students || []).forEach(function (stu) { if (stu && stu.id === revStu) revWho = stu; });
+      var revStored = latestRemark(revWho, revSession);
+      var revTag = revStored && remarkTagInfo(revStored.tag) ? revStored.tag : 'uncategorized';
+      ui.remarkEditor = {
+        classId: revClass,
+        stuId: revStu,
+        sessionKey: revSession,
+        label: btn.getAttribute('data-label') || revSession,
+        tag: revTag,
+        text: revStored ? String(revStored.text || '') : ''
+      };
+      render();
+      return;
+    }
+    if (act === 'remark-revise-close') {
+      ui.remarkEditor = null;
+      render();
+      return;
+    }
+    if (act === 'remark-style') {
+      var styleBox = document.getElementById('remark-composer');
+      if (!styleBox || styleBox.getAttribute('contenteditable') !== 'true') return;
+      if (!remarkSelInside(styleBox)) { styleBox.focus(); return; }
+      var styleName = btn.getAttribute('data-style');
+      document.execCommand(styleName === 'bold' ? 'bold' : styleName === 'underline' ? 'underline' : 'italic', false, null);
+      return;
+    }
+    if (act === 'remark-pick') {
+      if (deny(canEdit())) return;
+      if (!ui.remarkEditor) return;
+      ui.remarkEditor.text = composerMarkup();
+      ui.remarkEditor.tag = btn.getAttribute('data-tag') || 'uncategorized';
+      render();
+      return;
+    }
+    if (act === 'remark-save') { saveRemarkCard(btn); return; }
+    if (act === 'remark-back') {
+      ui.remarkClassId = '';
+      ui.remarkOpenClass = '';
+      ui.remarkSession = '';
+      ui.remarkDraft = null;
+      ui.remarkEditor = null;
+      render();
+      return;
+    }
     if (act === 'remark-confirm') { confirmRemarkBulk(); return; }
     if (act === 'remark-edit') { readRemarkDom(); if (ui.remarkDraft) ui.remarkDraft.editing = true; render(); return; }
     if (act === 'remark-done') { commitRemarks(); return; }
@@ -8531,8 +9135,15 @@
         ui.formError = '';
       }
       if (ui.screen === 'care') ui.careClassId = '';
-      if (ui.screen === 'remarks') { ui.remarkClassId = ''; ui.remarkDraft = null; }
-      if (ui.screen === 'remark-read') { ui.remarkReadId = ''; ui.remarkSlip = ''; }
+      if (ui.screen === 'remarks' || ui.screen === 'remark-read') {
+        ui.remarkClassId = '';
+        ui.remarkDraft = null;
+        ui.remarkEditor = null;
+        ui.remarkOpenClass = '';
+        ui.remarkSession = '';
+        ui.remarkSlip = '';
+        ui.remarkReadId = '';
+      }
       if (ui.screen === 'profile') ui.profileEdit = false;
       render();
       releasePending();
@@ -8982,6 +9593,11 @@
       render();
       return;
     }
+    if (act === 'exam-clear-filter') {
+      ui.examFilter = { fet: '', grade: '', program: '' };
+      render();
+      return;
+    }
     if (act === 'transfer-pick') {
       var transferId = btn.getAttribute('data-id');
       if (ui.modal) ui.modal.target = transferId;
@@ -9134,11 +9750,22 @@
 
   document.addEventListener('toggle', function (e) {
     var fold = e.target;
-    if (!fold || !fold.classList || !fold.classList.contains('exam-score-fold')) return;
-    var foldId = fold.getAttribute('data-entry') || '';
-    if (!ui.examFolds) ui.examFolds = {};
-    if (fold.open) ui.examFolds[foldId] = true;
-    else delete ui.examFolds[foldId];
+    if (!fold || !fold.classList) return;
+    if (fold.classList.contains('exam-score-fold')) {
+      var foldId = fold.getAttribute('data-entry') || '';
+      if (!ui.examFolds) ui.examFolds = {};
+      if (fold.open) ui.examFolds[foldId] = true;
+      else delete ui.examFolds[foldId];
+      return;
+    }
+    if (!fold.classList.contains('remark-fold') || remarkPainting) return;
+    var classId = fold.getAttribute('data-class') || '';
+    var next = fold.open ? classId : '';
+    if ((ui.remarkOpenClass || '') === next) return;
+    ui.remarkOpenClass = next;
+    remarkPainting = true;
+    render();
+    remarkPainting = false;
   }, true);
 
   document.addEventListener('change', function (e) {
@@ -9187,6 +9814,34 @@
     }
     if (t.id === 'photo-file' && t.files && t.files[0]) {
       takePhotoFile(t.files[0]);
+      return;
+    }
+    if (t.id === 'remark-month') {
+      ui.remarkMonth = t.value;
+      ui.remarkSession = '';
+      ui.remarkDraft = null;
+      ui.remarkEditor = null;
+      ui.remarkSlip = '';
+      render();
+      return;
+    }
+    if (t.id === 'remark-session-pick') {
+      ui.remarkSession = t.value || '';
+      ui.remarkDraft = null;
+      ui.remarkEditor = null;
+      render();
+      return;
+    }
+    if (t.matches('[data-remark-note]')) {
+      var noteCard = t.closest('.remark-card');
+      var noteOn = noteCard && noteCard.querySelector('.remark-chip.is-on');
+      ui.remarkDraft = {
+        classId: t.getAttribute('data-class') || '',
+        stuId: t.getAttribute('data-stu') || '',
+        sessionKey: t.getAttribute('data-session') || '',
+        tag: noteOn ? noteOn.getAttribute('data-tag') : 'uncategorized',
+        text: t.value
+      };
       return;
     }
     if (t.id === 'remark-session') {
@@ -9273,6 +9928,13 @@
     if (t.id === 'hw-excel-file') readHomeworkFile(t.files && t.files[0]);
     if (t.matches('[data-filter]')) {
       ui.staffFilter[t.getAttribute('data-filter')] = t.value;
+      render();
+      return;
+    }
+    if (t.matches('[data-exam-filter]')) {
+      var examKey = t.getAttribute('data-exam-filter');
+      if (!ui.examFilter) ui.examFilter = { fet: '', grade: '', program: '' };
+      if (examKey === 'fet' || examKey === 'grade' || examKey === 'program') ui.examFilter[examKey] = t.value;
       render();
       return;
     }
@@ -9393,6 +10055,29 @@
     if (e.key !== 'Enter' || !e.target || e.target.id !== 'dict-q') return;
     e.preventDefault();
     dictLookup(e.target.value);
+  });
+
+  document.addEventListener('keydown', function (e) {
+    var box = document.getElementById('remark-composer');
+    if (!box || box.getAttribute('contenteditable') !== 'true') return;
+    var active = document.activeElement;
+    if (active !== box && !(active && box.contains(active))) return;
+    var key = String(e.key || '').toLowerCase();
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (key === 'i' || key === 'b' || key === 'u')) {
+      e.preventDefault();
+      document.execCommand(key === 'b' ? 'bold' : key === 'i' ? 'italic' : 'underline', false, null);
+      return;
+    }
+    if (key === 'enter' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      document.execCommand('insertLineBreak');
+    }
+  });
+
+  document.addEventListener('mousedown', function (e) {
+    var styleBtn = e.target && e.target.closest ? e.target.closest('[data-act="remark-style"]') : null;
+    if (!styleBtn || styleBtn.disabled) return;
+    e.preventDefault();
   });
 
   document.addEventListener('input', function (e) {
@@ -9572,6 +10257,7 @@
       return;
     }
     if (!document.getElementById('settingsbox').classList.contains('hidden')) { closeSettings(); return; }
+    if (ui.remarkEditor) { ui.remarkEditor = null; render(); return; }
     if (ui.modal) { ui.modal = null; ui.formError = ''; ui.importDraft = null; render(); releasePending(); return; }
     if (ui.detailId) { ui.detailId = null; ui.detailEdit = false; render(); releasePending(); }
   });
