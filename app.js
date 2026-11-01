@@ -2,7 +2,7 @@
   'use strict';
 
   var L = window.OceanLogic;
-  var APP_TITLE = 'Ocean EDU - Student management list (Unofficial) ver 1.5.7';
+  var APP_TITLE = 'Ocean EDU - Student management list (Unofficial) ver 1.5.8';
   var SUGGEST_URL = 'https://script.google.com/macros/s/AKfycbyNFHdMszhrmqyfXDHSDi2ti51y5_Ib3kiXgA5cGzcPkWLboUJSnPYJ5xwikb9N-fLOkg/exec';
   var PRIMARY_IDS = ['ocean', 'sky', 'teal', 'green', 'lime', 'amber', 'orange', 'coral', 'rose', 'violet', 'indigo', 'slate'];
   var SKIN_BOOK = [
@@ -324,7 +324,8 @@
         'Ocean EDU - Student management list (Unofficial) ver 1.5.3',
         'Ocean EDU - Student management list (Unofficial) ver 1.5.4',
         'Ocean EDU - Student management list (Unofficial) ver 1.5.5',
-        'Ocean EDU - Student management list (Unofficial) ver 1.5.6'
+        'Ocean EDU - Student management list (Unofficial) ver 1.5.6',
+        'Ocean EDU - Student management list (Unofficial) ver 1.5.7'
       ];
       if (!state.settings.title || legacyTitle.indexOf(state.settings.title) >= 0) state.settings.title = APP_TITLE;
       delete state.settings.supabaseUrl;
@@ -469,7 +470,7 @@
     var rows = (Array.isArray(list) ? list : []).filter(function (item) {
       return item && typeof item === 'object' && (item.name || item.code || item.id);
     }).map(function (item) {
-      return {
+      var row = {
         id: item.id || L.uid(),
         code: item.code || '',
         name: item.name || '?',
@@ -494,6 +495,17 @@
         expiredAt: item.expiredAt || '',
         archivedAt: item.archivedAt || ''
       };
+      if (item.curriculum && typeof item.curriculum === 'object' && !Array.isArray(item.curriculum) && Object.keys(item.curriculum).length) {
+        row.curriculum = item.curriculum;
+      }
+      if (item.homework && typeof item.homework === 'object' && !Array.isArray(item.homework) && Object.keys(item.homework).length) {
+        row.homework = item.homework;
+      }
+      if (item.bookStatus) row.bookStatus = String(item.bookStatus);
+      if (item.pecMode) row.pecMode = String(item.pecMode);
+      if (item.pecUser) row.pecUser = String(item.pecUser);
+      if (item.pecPass) row.pecPass = String(item.pecPass);
+      return row;
     });
     var keep = [];
     droppedArchive = [];
@@ -626,7 +638,7 @@
     }
     if (sharePersonnel) {
       state.personnel = normalizePersonnel(state.personnel);
-      if (state.personnel.length) personnelSeen = true;
+      personnelSeen = true;
     }
     if (shareSoa) {
       state.soaSlots = normalizeSoa(state.soaSlots);
@@ -634,21 +646,44 @@
     }
   }
 
+  function examTypeOf(value) {
+    if (value === 'pick' || value === 'biannual' || value === 'class') return value;
+    return 'class';
+  }
+
+  function examDayKey(value) {
+    var text = String(value || '').slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : '';
+  }
+
+  function examSessionTags(entry) {
+    var tags = {};
+    var src = entry && entry.sessionTags;
+    if (!src || typeof src !== 'object' || Array.isArray(src)) return tags;
+    Object.keys(src).forEach(function (iso) {
+      var day = examDayKey(iso);
+      var tag = String(src[iso] || '').trim();
+      if (day && tag) tags[day] = tag;
+    });
+    return tags;
+  }
+
   function normalizeExams(list) {
     return (Array.isArray(list) ? list : []).filter(function (item) {
       return item && typeof item === 'object' && String(item.name || '').trim();
     }).map(function (item) {
-      return {
+      var type = examTypeOf(item.type);
+      var exam = {
         id: item.id || L.uid(),
         name: String(item.name || '').trim(),
-        type: item.type === 'pick' ? 'pick' : 'class',
+        type: type,
         ageFrom: item.ageFrom == null ? '' : String(item.ageFrom),
         ageTo: item.ageTo == null ? '' : String(item.ageTo),
         createdAt: item.createdAt || '',
         entries: (Array.isArray(item.entries) ? item.entries : []).filter(function (entry) {
           return entry && typeof entry === 'object';
         }).map(function (entry) {
-          return {
+          var row = {
             classId: entry.classId || '',
             className: entry.className || '',
             slotDow: examSlotDow(entry.slotDow),
@@ -659,7 +694,7 @@
             students: (Array.isArray(entry.students) ? entry.students : []).filter(function (stu) {
               return stu && typeof stu === 'object';
             }).map(function (stu) {
-              return {
+              var pupil = {
                 studentId: stu.studentId || '',
                 name: stu.name || '',
                 englishName: stu.englishName || '',
@@ -669,10 +704,22 @@
                 review: stu.review == null ? '' : String(stu.review),
                 extra: !!stu.extra
               };
+              if (stu.out === true) pupil.out = true;
+              return pupil;
             })
           };
+          var tags = examSessionTags(entry);
+          if (Object.keys(tags).length) row.sessionTags = tags;
+          return row;
         })
       };
+      var quarter = String(item.quarter || '');
+      if (quarter === 'I' || quarter === 'II' || quarter === 'III' || quarter === 'IV') exam.quarter = quarter;
+      var rangeFrom = examDayKey(item.rangeFrom);
+      var rangeTo = examDayKey(item.rangeTo);
+      if (rangeFrom) exam.rangeFrom = rangeFrom;
+      if (rangeTo) exam.rangeTo = rangeTo;
+      return exam;
     });
   }
 
@@ -680,6 +727,49 @@
     var archive = state.archive || [];
     if (!archivePurgePersist && droppedArchive.length) return archive.concat(droppedArchive);
     return archive;
+  }
+
+  var STUDENT_SHARE_KEYS = ['remarks', 'care', 'curriculum', 'homework', 'photo', 'bookStatus', 'pecMode', 'pecUser', 'pecPass'];
+
+  function studentBagAbsent(value, key) {
+    if (value == null || value === '') return true;
+    if (key === 'homework' && value && typeof value === 'object' && !Array.isArray(value) && !Object.keys(value).length) return true;
+    return false;
+  }
+
+  function studentBagPresent(value) {
+    if (value == null || value === '') return false;
+    if (Array.isArray(value)) return value.length > 0;
+    if (typeof value === 'object') return Object.keys(value).length > 0;
+    return true;
+  }
+
+  function fillClassBags(kept, other) {
+    if (!Array.isArray(kept) || !Array.isArray(other)) return;
+    var classes = {};
+    other.forEach(function (cls) {
+      if (!cls || !cls.id) return;
+      var students = {};
+      (cls.students || []).forEach(function (stu) {
+        if (stu && stu.id) students[stu.id] = stu;
+      });
+      classes[cls.id] = students;
+    });
+    kept.forEach(function (cls) {
+      var students = classes[cls && cls.id];
+      if (!students) return;
+      (cls.students || []).forEach(function (stu) {
+        if (!stu || !stu.id || !students[stu.id]) return;
+        var from = students[stu.id];
+        STUDENT_SHARE_KEYS.forEach(function (key) {
+          if (!studentBagAbsent(stu[key], key) || !studentBagPresent(from[key])) return;
+          stu[key] = from[key];
+          if (key === 'remarks' && Array.isArray(stu.remarks)) stu.remarks = normalizeRemarks(stu.remarks);
+          if (key === 'care' && stu.care) stu.care = normalizeCare(stu.care);
+          if (key === 'photo') stu.photo = safePhotoName(stu.photo);
+        });
+      });
+    });
   }
 
   function classListScore(classes) {
@@ -838,14 +928,17 @@
     var incomingScore = classListScore(incoming);
     var currentScore = classListScore(state.classes);
     if (currentScore > 0 && incomingStamp < currentStamp) {
+      fillClassBags(state.classes, incoming);
       if (!classAdopted) classNote = 'Máy này đang giữ lớp, học viên và chuyên cần mới hơn file ocean-edu-classes.json.';
       return;
     }
     if (currentScore > 0 && incomingStamp === currentStamp && incomingScore <= currentScore) {
+      fillClassBags(state.classes, incoming);
       if (!classAdopted) classNote = 'Máy này đang giữ lớp, học viên và chuyên cần mới hơn file ocean-edu-classes.json.';
       return;
     }
     var sameStamp = currentScore > 0 && incomingStamp === currentStamp;
+    fillClassBags(incoming, state.classes);
     state.classes = normalizeClasses(incoming);
     state.settings.classesSavedAt = file.savedAt || state.settings.classesSavedAt || '';
     persistBook = true;
@@ -881,6 +974,7 @@
     };
     if (examsSeen || (state.exams && state.exams.length)) body.exams = state.exams || [];
     if (staffBookSeen || staffBookHasData()) body.staffBook = state.staffBook || {};
+    if (personnelSeen || (state.personnel && state.personnel.length)) body.personnel = state.personnel || [];
     if (soaSeen || (state.soaSlots && state.soaSlots.length)) body.soaSlots = state.soaSlots || [];
     return JSON.stringify(body);
   }
@@ -895,6 +989,7 @@
     if (classShareAt) payload.shareAt = classShareAt;
     if (examsSeen || (state.exams && state.exams.length)) payload.exams = state.exams || [];
     if (staffBookSeen || staffBookHasData()) payload.staffBook = state.staffBook || {};
+    if (personnelSeen || (state.personnel && state.personnel.length)) payload.personnel = state.personnel || [];
     if (soaSeen || (state.soaSlots && state.soaSlots.length)) payload.soaSlots = state.soaSlots || [];
     return payload;
   }

@@ -891,7 +891,7 @@
   function archiveRecord(cls, stu, phase, now) {
     var grade = gradeById(cls && cls.gradeId);
     var track = cls && cls.kind === 'custom' ? 'CUSTOM' : (grade ? grade.track : '');
-    return {
+    var row = {
       id: stu.id,
       code: stu.code || '',
       name: stu.name || '',
@@ -916,6 +916,17 @@
       expiredAt: phase && phase.expiredAt ? phase.expiredAt.toISOString() : '',
       archivedAt: (now instanceof Date ? now : new Date()).toISOString()
     };
+    if (stu.curriculum && typeof stu.curriculum === 'object' && !Array.isArray(stu.curriculum) && Object.keys(stu.curriculum).length) {
+      row.curriculum = stu.curriculum;
+    }
+    if (stu.homework && typeof stu.homework === 'object' && !Array.isArray(stu.homework) && Object.keys(stu.homework).length) {
+      row.homework = stu.homework;
+    }
+    if (stu.bookStatus) row.bookStatus = stu.bookStatus;
+    if (stu.pecMode) row.pecMode = stu.pecMode;
+    if (stu.pecUser) row.pecUser = stu.pecUser;
+    if (stu.pecPass) row.pecPass = stu.pecPass;
+    return row;
   }
 
   function settleRoster(state, now) {
