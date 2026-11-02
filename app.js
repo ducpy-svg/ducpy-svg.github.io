@@ -2,7 +2,7 @@
   'use strict';
 
   var L = window.OceanLogic;
-  var APP_TITLE = 'Ocean EDU - Student management list (Unofficial) ver 1.5.9';
+  var APP_TITLE = 'Ocean EDU - Student management list (Unofficial) ver 1.5.10';
   var SUGGEST_URL = 'https://script.google.com/macros/s/AKfycbyNFHdMszhrmqyfXDHSDi2ti51y5_Ib3kiXgA5cGzcPkWLboUJSnPYJ5xwikb9N-fLOkg/exec';
   var PRIMARY_IDS = ['ocean', 'sky', 'teal', 'green', 'lime', 'amber', 'orange', 'coral', 'rose', 'violet', 'indigo', 'slate'];
   var SKIN_BOOK = [
@@ -94,6 +94,8 @@
   var STORAGE = 'oceanEdu.v1';
   var DATA_FILE = 'ocean-edu-data.json';
   var CLASS_FILE = 'ocean-edu-classes.json';
+  var REMARK_FILE = 'ocean-edu-remarks.json';
+  var LOGIN_KEY = 'oceanEduLogin';
 
   function defaultAccount() {
     return { id: 'admin-origin', username: '25040392', password: 'Origin2003', name: 'Admin Quang Đức', role: 'admin' };
@@ -241,6 +243,10 @@
   var persistBook = false;
   var dataNote = 'Chưa đọc file data trên bản web.';
   var classNote = 'Chưa đọc file lớp, học viên và chuyên cần.';
+  var remarkNote = 'Chưa đọc file nhận xét.';
+  var remarksSavedAt = '';
+  var lastRemarkBody = null;
+  var syncShownAt = 0;
   var lastClassJson = null;
   var lastClassDiskBody = null;
   var classShareAt = '';
@@ -326,7 +332,8 @@
         'Ocean EDU - Student management list (Unofficial) ver 1.5.5',
         'Ocean EDU - Student management list (Unofficial) ver 1.5.6',
         'Ocean EDU - Student management list (Unofficial) ver 1.5.7',
-        'Ocean EDU - Student management list (Unofficial) ver 1.5.8'
+        'Ocean EDU - Student management list (Unofficial) ver 1.5.8',
+        'Ocean EDU - Student management list (Unofficial) ver 1.5.9'
       ];
       if (!state.settings.title || legacyTitle.indexOf(state.settings.title) >= 0) state.settings.title = APP_TITLE;
       delete state.settings.supabaseUrl;
@@ -865,6 +872,82 @@
     });
   }
 
+  function remarkOmit(key, value) {
+    if (key === 'remarks' || key === 'remarkAt') return undefined;
+    return value;
+  }
+
+  function remarkEntryOf(stu) {
+    if (!stu || !stu.id) return null;
+    var remarks = Array.isArray(stu.remarks) ? normalizeRemarks(stu.remarks) : [];
+    var remarkAt = stu.remarkAt ? String(stu.remarkAt) : '';
+    if (!remarks.length && !remarkAt) return null;
+    var row = { remarks: remarks };
+    if (remarkAt) row.remarkAt = remarkAt;
+    return row;
+  }
+
+  function remarkBookPayload() {
+    var students = {};
+    var archive = {};
+    function put(stu, bag) {
+      var row = remarkEntryOf(stu);
+      if (row) bag[String(stu.id)] = row;
+    }
+    (state.classes || []).forEach(function (cls) {
+      (cls.students || []).forEach(function (stu) { put(stu, students); });
+    });
+    (state.archive || []).forEach(function (stu) { put(stu, archive); });
+    (droppedArchive || []).forEach(function (stu) {
+      if (stu && stu.id && !archive[String(stu.id)]) put(stu, archive);
+    });
+    return {
+      kind: 'ocean-edu-remarks',
+      savedAt: remarksSavedAt || '',
+      students: students,
+      archive: archive
+    };
+  }
+
+  function remarkBodyJson() {
+    var book = remarkBookPayload();
+    return JSON.stringify({ students: book.students, archive: book.archive });
+  }
+
+  function remarkMap(file, key) {
+    var bag = file && file[key];
+    if (!bag || typeof bag !== 'object' || Array.isArray(bag)) return null;
+    return bag;
+  }
+
+  function applyRemarkBook(file) {
+    if (!file || typeof file !== 'object' || file.kind !== 'ocean-edu-remarks') return;
+    var students = remarkMap(file, 'students');
+    var archive = remarkMap(file, 'archive');
+    if (students) {
+      (state.classes || []).forEach(function (cls) {
+        (cls.students || []).forEach(function (stu) {
+          if (!stu || !stu.id || !students[stu.id]) return;
+          syncStudentRemarks(stu, students[stu.id], cls, cls);
+        });
+      });
+    }
+    if (archive) {
+      (state.archive || []).forEach(function (row) {
+        if (!row || !row.id || !archive[row.id]) return;
+        syncStudentRemarks(row, archive[row.id], null, null);
+      });
+    }
+    if (file.savedAt && remarkTime(file.savedAt) > remarkTime(remarksSavedAt)) remarksSavedAt = String(file.savedAt);
+  }
+
+  function adoptRaw(raw) {
+    var carried = remarkBookPayload();
+    localRaw = raw;
+    applyRaw(raw);
+    applyRemarkBook(carried);
+  }
+
   function fillClassBags(kept, other) {
     if (!Array.isArray(kept) || !Array.isArray(other)) return;
     var classes = {};
@@ -971,12 +1054,11 @@
   function hydrateBook() {
     return readIdbBook().then(function (stored) {
       if (stored && shouldAdopt(localRaw, stored)) {
-        localRaw = stored;
-        applyRaw(stored);
+        adoptRaw(stored);
         persistBook = true;
         dataNote = 'Đã lấy lại dữ liệu từ bộ nhớ trình duyệt trên máy này.';
       }
-      return Promise.all([fetchBook(DATA_FILE), fetchBook(CLASS_FILE)]).then(function (httpPair) {
+      return Promise.all([fetchBook(DATA_FILE), fetchBook(CLASS_FILE), fetchBook(REMARK_FILE)]).then(function (httpPair) {
         return folderBooks().then(function (diskPair) {
           return { http: httpPair, disk: diskPair };
         });
@@ -984,11 +1066,12 @@
     }).then(function (books) {
       var remote = books.http[0];
       var classFile = books.http[1];
+      var remoteRemarks = books.http[2];
       var diskData = books.disk[0];
       var diskClasses = books.disk[1];
+      var diskRemarks = books.disk[2];
       if (remote && shouldAdopt(localRaw, remote)) {
-        localRaw = remote;
-        applyRaw(remote);
+        adoptRaw(remote);
         persistBook = true;
         dataNote = 'Đã đọc ocean-edu-data.json. Tài khoản và thông báo lấy từ file này.';
       } else if (remote && bookScore(remote) > 0) {
@@ -997,8 +1080,7 @@
         dataNote = 'Không thấy ocean-edu-data.json cạnh index.html.';
       }
       if (diskData && shouldAdopt(localRaw, diskData)) {
-        localRaw = diskData;
-        applyRaw(diskData);
+        adoptRaw(diskData);
         persistBook = true;
         dataNote = 'Đã đọc ocean-edu-data.json trong thư mục Index local.';
       }
@@ -1027,8 +1109,14 @@
           classNote = (classNote ? classNote + ' ' : '') + 'Đã chuyển XH_TEENS2_Pre-IELTS sang nhóm IELTS. Tên trình độ vẫn là TEENS.';
         }
       }
-      lastClassJson = JSON.stringify(state.classes);
+      applyRemarkBook(remoteRemarks);
+      applyRemarkBook(diskRemarks);
+      if ((remoteRemarks && remoteRemarks.kind === 'ocean-edu-remarks') || (diskRemarks && diskRemarks.kind === 'ocean-edu-remarks')) {
+        remarkNote = 'Đã đọc ocean-edu-remarks.json. Thẻ nhận xét và nội dung nhận xét lấy từ file này.';
+      }
+      lastClassJson = JSON.stringify(state.classes, remarkOmit);
       lastClassDiskBody = classDiskBody();
+      lastRemarkBody = remarkBodyJson();
     }).catch(function () {});
   }
 
@@ -1098,7 +1186,7 @@
     if (staffBookSeen || staffBookHasData()) body.staffBook = state.staffBook || {};
     if (personnelSeen || (state.personnel && state.personnel.length)) body.personnel = state.personnel || [];
     if (soaSeen || (state.soaSlots && state.soaSlots.length)) body.soaSlots = state.soaSlots || [];
-    return JSON.stringify(body);
+    return JSON.stringify(body, remarkOmit);
   }
 
   function classBookPayload() {
@@ -1147,6 +1235,7 @@
   function writeNamedFile(name, json) {
     if (!dirHandle || !dirHandle.getFileHandle) return Promise.resolve(false);
     if (!json || String(json).charAt(0) !== '{') return Promise.resolve(false);
+    if (name === REMARK_FILE && String(json).indexOf('"ocean-edu-remarks"') < 0) return Promise.resolve(false);
     if ((name === CLASS_FILE || name === DATA_FILE) && String(json).indexOf('"classes"') < 0) return Promise.resolve(false);
     return dirHandle.getFileHandle(name, { create: true }).then(function (file) {
       return file.createWritable().then(function (stream) {
@@ -1156,7 +1245,11 @@
   }
 
   function writeDataFile() {
-    return writeFrozenFiles(JSON.stringify(dataPayload()), JSON.stringify(classBookPayload()));
+    return writeFrozenFiles(
+      JSON.stringify(dataPayload(), remarkOmit),
+      JSON.stringify(classBookPayload(), remarkOmit),
+      JSON.stringify(remarkBookPayload())
+    );
   }
 
   function readHandleJson(name) {
@@ -1189,7 +1282,7 @@
 
   function folderBooks() {
     if (!dirHandle) return Promise.resolve([null, null]);
-    return Promise.all([readHandleJson(DATA_FILE), readHandleJson(CLASS_FILE)]);
+    return Promise.all([readHandleJson(DATA_FILE), readHandleJson(CLASS_FILE), readHandleJson(REMARK_FILE)]);
   }
 
   function rememberFolder(handle) {
@@ -1209,11 +1302,13 @@
     var box = document.getElementById('syncbox');
     if (!box) return;
     clearTimeout(syncTimer);
+    syncTimer = null;
     box.classList.remove('hidden', 'is-saving', 'is-confirmed');
     var label = document.getElementById('sync-label');
     if (mode === 'saving') {
+      syncShownAt = Date.now();
       box.classList.add('is-saving');
-      if (label) label.textContent = '';
+      if (label) label.textContent = 'Đang lưu';
       return;
     }
     if (mode === 'confirmed') {
@@ -1222,17 +1317,19 @@
       syncTimer = setTimeout(function () { box.classList.add('hidden'); }, 2200);
       return;
     }
+    if (label) label.textContent = '';
     box.classList.add('hidden');
   }
 
   var folderWrite = Promise.resolve();
   var folderSerial = 0;
 
-  function writeFrozenFiles(dataJson, classFileJson) {
+  function writeFrozenFiles(dataJson, classFileJson, remarkFileJson) {
     return ensureFolderWrite().then(function (ok) {
       if (!ok) return false;
       var jobs = [writeNamedFile(DATA_FILE, dataJson)];
       if (classFileJson != null) jobs.push(writeNamedFile(CLASS_FILE, classFileJson));
+      if (remarkFileJson != null) jobs.push(writeNamedFile(REMARK_FILE, remarkFileJson));
       return Promise.all(jobs).then(function (flags) {
         return flags.every(function (flag) { return !!flag; });
       });
@@ -1244,7 +1341,7 @@
     Object.keys(cls || {}).forEach(function (key) {
       if (key !== 'updatedAt') copy[key] = cls[key];
     });
-    return JSON.stringify(copy);
+    return JSON.stringify(copy, remarkOmit);
   }
 
   function stampClassUpdates() {
@@ -1270,21 +1367,31 @@
 
   function save(options) {
     if (savePaused) return true;
-    if (!(options && (options.quiet || options.keepStamp))) archivePurgePersist = true;
+    var quiet = !!(options && options.quiet);
+    var keepStamp = !!(options && options.keepStamp);
+    if (!quiet && !keepStamp) archivePurgePersist = true;
     stampClassUpdates();
-    var classJson = JSON.stringify(state.classes);
+    var classJson = JSON.stringify(state.classes, remarkOmit);
     if (lastClassJson !== null && classJson !== lastClassJson) state.settings.classesSavedAt = new Date().toISOString();
     lastClassJson = classJson;
-    if (!(options && options.keepStamp) || !state.settings.savedAt) {
+    var savedAtBefore = state.settings.savedAt || '';
+    if (!keepStamp || !state.settings.savedAt) {
       state.settings.savedAt = new Date().toISOString();
       state.settings.rev = (Number(state.settings.rev) || 0) + 1;
     }
+    var savedAtMoved = (state.settings.savedAt || '') !== savedAtBefore;
     var diskBody = classDiskBody();
     var classFileDirty = lastClassDiskBody === null || diskBody !== lastClassDiskBody;
     if (classFileDirty) classShareAt = state.settings.savedAt || new Date().toISOString();
     lastClassDiskBody = diskBody;
+    var remarkBody = remarkBodyJson();
+    var remarkDirty = lastRemarkBody === null || remarkBody !== lastRemarkBody;
+    if (remarkDirty) remarksSavedAt = new Date().toISOString();
+    lastRemarkBody = remarkBodyJson();
     var dataJson = JSON.stringify(dataPayload());
-    var classFileJson = classFileDirty ? JSON.stringify(classBookPayload()) : null;
+    var folderData = JSON.stringify(dataPayload(), remarkOmit);
+    var classFileJson = classFileDirty ? JSON.stringify(classBookPayload(), remarkOmit) : null;
+    var remarkFileJson = remarkDirty ? JSON.stringify(remarkBookPayload()) : null;
     var snapshot = JSON.parse(dataJson);
     localRaw = snapshot;
     var stored = true;
@@ -1298,23 +1405,27 @@
       var tx = db.transaction('kv', 'readwrite');
       tx.objectStore('kv').put(JSON.parse(dataJson), 'state');
     }).catch(function () {});
-    var quiet = options && options.quiet;
+    var folderNew = savedAtMoved || classFileDirty || remarkDirty;
     var serial = ++folderSerial;
-    if (!quiet) showSync('saving');
+    if (folderNew) showSync('saving');
     folderWrite = folderWrite.catch(function () { return false; }).then(function () {
       if (serial !== folderSerial) return false;
-      return writeFrozenFiles(dataJson, classFileJson);
+      return writeFrozenFiles(folderData, classFileJson, remarkFileJson);
     }).then(function (ok) {
-      if (serial !== folderSerial || quiet) return;
-      if (ok) { showSync('confirmed'); return; }
-      showSync('idle');
-      if (!stored) return;
-      if (!syncWarned) {
+      if (serial !== folderSerial || !folderNew) return;
+      var wait = 450 - (Date.now() - syncShownAt);
+      if (wait < 0) wait = 0;
+      clearTimeout(syncTimer);
+      syncTimer = setTimeout(function () {
+        if (serial !== folderSerial) return;
+        if (ok) { showSync('confirmed'); return; }
+        showSync('idle');
+        if (quiet || !stored || syncWarned) return;
         syncWarned = true;
         toast('Đã lưu trên trình duyệt. Chưa ghi được file JSON trong thư mục. Hãy chọn thư mục Index local một lần để lần sau ghi thẳng và hiện confirmed.');
-      }
+      }, wait);
     }).catch(function () {
-      if (serial !== folderSerial || quiet) return;
+      if (serial !== folderSerial || !folderNew || quiet) return;
       showSync('idle');
     });
     return true;
@@ -2052,7 +2163,31 @@
       '</div>';
   }
 
+  function readLoginMemory() {
+    try {
+      var raw = JSON.parse(localStorage.getItem(LOGIN_KEY) || 'null');
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw) || !raw.username) return null;
+      return { username: String(raw.username), password: raw.password == null ? '' : String(raw.password) };
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function writeLoginMemory(username, password) {
+    try {
+      localStorage.setItem(LOGIN_KEY, JSON.stringify({
+        username: String(username || ''),
+        password: password == null ? '' : String(password)
+      }));
+    } catch (err) {}
+  }
+
+  function clearLoginMemory() {
+    try { localStorage.removeItem(LOGIN_KEY); } catch (err) {}
+  }
+
   function viewLogin() {
+    var memory = readLoginMemory();
     return '<div class="wrap">' +
       '<div class="login-tools">' + toolButtons() + '</div>' +
       '<div class="brand"><img class="logo-bob" src="Token.png" alt="Ocean EDU">' +
@@ -2061,9 +2196,10 @@
       boardHtml() +
       '<form class="login-card' + (ui.loginError ? ' shake' : '') + '" id="login-form">' +
       '<h2>Đăng nhập nhân sự</h2>' +
-      '<label class="field"><span>Username</span><input name="username" autocomplete="username" required></label>' +
-      '<label class="field"><span>Mật khẩu</span><input name="password" type="password" autocomplete="current-password"></label>' +
-      '<p class="help">Admin và Commenter nhập mật khẩu. Guest chỉ điền Username và để trống mật khẩu.</p>' +
+      '<label class="field"><span>Username</span><input name="username" autocomplete="username" required value="' + esc(memory ? memory.username : '') + '"></label>' +
+      '<label class="field"><span>Mật khẩu</span><input name="password" type="password" autocomplete="current-password" value="' + esc(memory ? memory.password : '') + '"></label>' +
+      '<label class="checkline"><input type="checkbox" name="remember" id="login-remember"' + (memory ? ' checked' : '') + '> Ghi nhớ mật khẩu trên thiết bị</label>' +
+      '<p class="help">Admin và Commenter nhập mật khẩu. Guest chỉ điền Username và để trống mật khẩu. Ghi nhớ mật khẩu chỉ lưu trên thiết bị này, không ghi vào file lớp.</p>' +
       '<p class="form-error" role="alert">' + esc(ui.loginError) + '</p>' +
       '<button class="btn btn-primary" type="submit">Đăng nhập</button></form></div>';
   }
@@ -8854,24 +8990,33 @@
       '<h3>Bản data dùng chung</h3>' +
       '<p class="help">' + esc(classNote) + '</p>' +
       '<p class="help">' + esc(dataNote) + '</p>' +
-      '<p class="help">App ghi ocean-edu-classes.json và ocean-edu-data.json vào thư mục Index local đã chọn. Góc trên hiện Token đang xoay, rồi chữ confirmed khi cả hai file đã ghi xong. Lúc mở trang, app đọc hai file này. Nếu quyền thư mục còn đang chờ, lần lưu do người dùng bấm sẽ xin quyền rồi ghi. Chưa chọn thư mục thì dữ liệu nằm trên trình duyệt và không hiện confirmed. GitHub chỉ phục vụ file đã đăng, máy khác thấy dữ liệu mới sau khi thư mục được đăng lại.</p>' +
+      '<p class="help">' + esc(remarkNote) + '</p>' +
+      '<p class="help">App ghi ocean-edu-classes.json, ocean-edu-data.json và ocean-edu-remarks.json vào thư mục Index local đã chọn. Thẻ nhận xét và nội dung nhận xét nằm ở ocean-edu-remarks.json. Khi có dữ liệu mới ghi vào thư mục, góc trên hiện Token đang xoay với chữ Đang lưu, rồi Token và chữ confirmed khi các file mới đã ghi xong. Lúc mở trang, app đọc ba file này. Nếu quyền thư mục còn đang chờ, lần lưu do người dùng bấm sẽ xin quyền rồi ghi. Chưa chọn thư mục thì dữ liệu nằm trên trình duyệt và không hiện confirmed. GitHub chỉ phục vụ file đã đăng, máy khác thấy dữ liệu mới sau khi thư mục được đăng lại.</p>' +
       '<div class="btn-row"><button type="button" class="btn btn-primary" data-act="download-classes">Tải ocean-edu-classes.json</button>' +
       '<button type="button" class="btn" data-act="download-data">Tải ocean-edu-data.json</button>' +
+      '<button type="button" class="btn" data-act="download-remarks">Tải ocean-edu-remarks.json</button>' +
       '<button type="button" class="btn" data-act="pick-folder">Chọn thư mục Index local</button></div>';
   }
 
   function downloadClasses() {
     if (deny(canEdit())) return;
-    var blob = new Blob([JSON.stringify(classBookPayload())], { type: 'application/json' });
+    var blob = new Blob([JSON.stringify(classBookPayload(), remarkOmit)], { type: 'application/json' });
     downloadBlob(blob, CLASS_FILE);
     toast('Đã tạo ocean-edu-classes.json. Chép file vào thư mục Index local, cạnh index.html, để đồng bộ lớp, học viên và chuyên cần.');
   }
 
   function downloadData() {
     if (deny(canEdit())) return;
-    var blob = new Blob([JSON.stringify(dataPayload())], { type: 'application/json' });
+    var blob = new Blob([JSON.stringify(dataPayload(), remarkOmit)], { type: 'application/json' });
     downloadBlob(blob, DATA_FILE);
     toast('Đã tạo ocean-edu-data.json. File này giữ tài khoản, thông báo và cả sổ lớp.');
+  }
+
+  function downloadRemarks() {
+    if (deny(canEdit())) return;
+    var blob = new Blob([JSON.stringify(remarkBookPayload())], { type: 'application/json' });
+    downloadBlob(blob, REMARK_FILE);
+    toast('Đã tạo ocean-edu-remarks.json. Chép file vào thư mục Index local để giữ thẻ nhận xét và nội dung nhận xét.');
   }
 
   function restoreDir() {
@@ -9042,7 +9187,7 @@
       'bulk-expire': 1, 'do-expire': 1, 'resume-student': 1,
       'archive-purge': 1, 'do-archive-purge': 1, 'rejoin-pick': 1,
       'new-account': 1, 'edit-account': 1, 'delete-account': 1,
-      'download-data': 1, 'download-classes': 1, 'pick-folder': 1,
+      'download-data': 1, 'download-classes': 1, 'download-remarks': 1, 'pick-folder': 1,
       'drop-image': 1, 'open-soa': 1, 'soa-drop': 1,
       'edit-staff': 1, 'save-staff': 1,
       'people-add': 1, 'people-edit': 1, 'people-save': 1,
@@ -9454,9 +9599,10 @@
     if (act === 'preview-close') { closePreview(); return; }
     if (act === 'download-classes') { downloadClasses(); return; }
     if (act === 'download-data') { downloadData(); return; }
+    if (act === 'download-remarks') { downloadRemarks(); return; }
     if (act === 'pick-folder') {
       if (!window.showDirectoryPicker) {
-        toast('Trình duyệt không cho trang ghi thẳng vào thư mục. Hãy tải ocean-edu-classes.json, chép vào Index local rồi đăng lại thư mục.');
+        toast('Trình duyệt không cho trang ghi thẳng vào thư mục. Hãy tải ba file JSON, chép vào Index local rồi đăng lại thư mục.');
         return;
       }
       folderAsked = true;
@@ -9466,11 +9612,11 @@
       }).then(function (ok) {
         if (ok) {
           showSync('confirmed');
-          toast('Đã gắn thư mục. Mỗi lần lưu, app ghi ocean-edu-classes.json và ocean-edu-data.json.');
+          toast('Đã gắn thư mục. Mỗi lần lưu, app ghi ocean-edu-classes.json, ocean-edu-data.json và ocean-edu-remarks.json.');
           return;
         }
         showSync('idle');
-        toast('Đã chọn thư mục nhưng chưa ghi được hai file JSON.');
+        toast('Đã chọn thư mục nhưng chưa ghi được file JSON.');
       }).catch(function (err) {
         showSync('idle');
         if (err && err.name === 'AbortError') return;
@@ -10407,6 +10553,9 @@
         render();
         return;
       }
+      var rememberBox = e.target.querySelector('[name="remember"]');
+      if (rememberBox && rememberBox.checked) writeLoginMemory(username, password);
+      else clearLoginMemory();
       ui.loginError = '';
       ui.user = { username: account.username, name: account.name, role: account.role };
       sessionStorage.setItem('oceanEduUser', JSON.stringify(ui.user));
