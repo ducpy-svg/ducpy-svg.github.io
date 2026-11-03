@@ -4049,5 +4049,7 @@ html[data-skin] button.remark-bold,
 html[data-theme="night"] button.remark-bold { font-weight: 800; }
 html[data-skin] button.remark-under,
 html[data-theme="night"] button.remark-under { text-decoration: underline; }
+.detail-mini { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.detail-mini .field { flex: 1 1 100%; margin: 0; }
 [data-scroll-keep] { overflow-anchor: none; scrollbar-gutter: stable; }
 

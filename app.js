@@ -2,7 +2,7 @@
   'use strict';
 
   var L = window.OceanLogic;
-  var APP_TITLE = 'Ocean EDU - Student management list (Unofficial) ver 1.5.10';
+  var APP_TITLE = 'Ocean EDU - Student management list (Unofficial) ver 1.5.11';
   var SUGGEST_URL = 'https://script.google.com/macros/s/AKfycbyNFHdMszhrmqyfXDHSDi2ti51y5_Ib3kiXgA5cGzcPkWLboUJSnPYJ5xwikb9N-fLOkg/exec';
   var PRIMARY_IDS = ['ocean', 'sky', 'teal', 'green', 'lime', 'amber', 'orange', 'coral', 'rose', 'violet', 'indigo', 'slate'];
   var SKIN_BOOK = [
@@ -125,6 +125,7 @@
     detailId: null,
     importDraft: null,
     detailEdit: false,
+    detailMini: '',
     boardMonth: '',
     weekOffset: 0,
     loginError: '',
@@ -333,7 +334,8 @@
         'Ocean EDU - Student management list (Unofficial) ver 1.5.6',
         'Ocean EDU - Student management list (Unofficial) ver 1.5.7',
         'Ocean EDU - Student management list (Unofficial) ver 1.5.8',
-        'Ocean EDU - Student management list (Unofficial) ver 1.5.9'
+        'Ocean EDU - Student management list (Unofficial) ver 1.5.9',
+        'Ocean EDU - Student management list (Unofficial) ver 1.5.10'
       ];
       if (!state.settings.title || legacyTitle.indexOf(state.settings.title) >= 0) state.settings.title = APP_TITLE;
       delete state.settings.supabaseUrl;
@@ -1120,6 +1122,32 @@
     }).catch(function () {});
   }
 
+  function takeMissingStudents(kept, other) {
+    var byId = {};
+    (other || []).forEach(function (cls) {
+      if (!cls || !cls.id) return;
+      var students = {};
+      (cls.students || []).forEach(function (stu) {
+        if (stu && stu.id) students[stu.id] = stu;
+      });
+      var at = Date.parse(cls.updatedAt || '');
+      byId[cls.id] = { at: isNaN(at) ? 0 : at, students: students };
+    });
+    (kept || []).forEach(function (cls) {
+      var bag = byId[cls && cls.id];
+      if (!bag) return;
+      var keptAt = Date.parse(cls.updatedAt || '');
+      if (isNaN(keptAt)) keptAt = 0;
+      if (bag.at < keptAt) return;
+      if (!Array.isArray(cls.students)) cls.students = [];
+      var have = {};
+      cls.students.forEach(function (stu) { if (stu && stu.id) have[stu.id] = true; });
+      Object.keys(bag.students).forEach(function (id) {
+        if (!have[id]) cls.students.push(bag.students[id]);
+      });
+    });
+  }
+
   function applyClassFile(file, fromFolder) {
     absorbShare(file);
     var incoming = file && Array.isArray(file.classes) ? file.classes : null;
@@ -1139,16 +1167,19 @@
     var currentScore = classListScore(state.classes);
     if (currentScore > 0 && incomingStamp < currentStamp) {
       fillClassBags(state.classes, incoming);
+      takeMissingStudents(state.classes, incoming);
       if (!classAdopted) classNote = 'Máy này đang giữ lớp, học viên và chuyên cần mới hơn file ocean-edu-classes.json.';
       return;
     }
     if (currentScore > 0 && incomingStamp === currentStamp && incomingScore <= currentScore) {
       fillClassBags(state.classes, incoming);
+      takeMissingStudents(state.classes, incoming);
       if (!classAdopted) classNote = 'Máy này đang giữ lớp, học viên và chuyên cần mới hơn file ocean-edu-classes.json.';
       return;
     }
     var sameStamp = currentScore > 0 && incomingStamp === currentStamp;
     fillClassBags(incoming, state.classes);
+    takeMissingStudents(incoming, state.classes);
     state.classes = normalizeClasses(incoming);
     state.settings.classesSavedAt = file.savedAt || state.settings.classesSavedAt || '';
     persistBook = true;
@@ -1186,7 +1217,7 @@
     if (staffBookSeen || staffBookHasData()) body.staffBook = state.staffBook || {};
     if (personnelSeen || (state.personnel && state.personnel.length)) body.personnel = state.personnel || [];
     if (soaSeen || (state.soaSlots && state.soaSlots.length)) body.soaSlots = state.soaSlots || [];
-    return JSON.stringify(body, remarkOmit);
+    return JSON.stringify(body);
   }
 
   function classBookPayload() {
@@ -1246,8 +1277,8 @@
 
   function writeDataFile() {
     return writeFrozenFiles(
-      JSON.stringify(dataPayload(), remarkOmit),
-      JSON.stringify(classBookPayload(), remarkOmit),
+      JSON.stringify(dataPayload()),
+      JSON.stringify(classBookPayload()),
       JSON.stringify(remarkBookPayload())
     );
   }
@@ -1324,8 +1355,9 @@
   var folderWrite = Promise.resolve();
   var folderSerial = 0;
 
-  function writeFrozenFiles(dataJson, classFileJson, remarkFileJson) {
-    return ensureFolderWrite().then(function (ok) {
+  function writeFrozenFiles(dataJson, classFileJson, remarkFileJson, permit) {
+    var ready = permit || ensureFolderWrite();
+    return ready.then(function (ok) {
       if (!ok) return false;
       var jobs = [writeNamedFile(DATA_FILE, dataJson)];
       if (classFileJson != null) jobs.push(writeNamedFile(CLASS_FILE, classFileJson));
@@ -1369,6 +1401,7 @@
     if (savePaused) return true;
     var quiet = !!(options && options.quiet);
     var keepStamp = !!(options && options.keepStamp);
+    var flush = !!(options && options.flush);
     if (!quiet && !keepStamp) archivePurgePersist = true;
     stampClassUpdates();
     var classJson = JSON.stringify(state.classes, remarkOmit);
@@ -1386,12 +1419,12 @@
     lastClassDiskBody = diskBody;
     var remarkBody = remarkBodyJson();
     var remarkDirty = lastRemarkBody === null || remarkBody !== lastRemarkBody;
-    if (remarkDirty) remarksSavedAt = new Date().toISOString();
+    if (remarkDirty || flush) remarksSavedAt = state.settings.savedAt || new Date().toISOString();
     lastRemarkBody = remarkBodyJson();
     var dataJson = JSON.stringify(dataPayload());
-    var folderData = JSON.stringify(dataPayload(), remarkOmit);
-    var classFileJson = classFileDirty ? JSON.stringify(classBookPayload(), remarkOmit) : null;
-    var remarkFileJson = remarkDirty ? JSON.stringify(remarkBookPayload()) : null;
+    var folderData = dataJson;
+    var classFileJson = classFileDirty ? JSON.stringify(classBookPayload()) : null;
+    var remarkFileJson = (remarkDirty || flush) ? JSON.stringify(remarkBookPayload()) : null;
     var snapshot = JSON.parse(dataJson);
     localRaw = snapshot;
     var stored = true;
@@ -1405,12 +1438,13 @@
       var tx = db.transaction('kv', 'readwrite');
       tx.objectStore('kv').put(JSON.parse(dataJson), 'state');
     }).catch(function () {});
-    var folderNew = savedAtMoved || classFileDirty || remarkDirty;
+    var folderNew = savedAtMoved || classFileDirty || remarkDirty || flush;
     var serial = ++folderSerial;
+    var permit = folderNew ? ensureFolderWrite() : Promise.resolve(false);
     if (folderNew) showSync('saving');
     folderWrite = folderWrite.catch(function () { return false; }).then(function () {
       if (serial !== folderSerial) return false;
-      return writeFrozenFiles(folderData, classFileJson, remarkFileJson);
+      return writeFrozenFiles(folderData, classFileJson, remarkFileJson, permit);
     }).then(function (ok) {
       if (serial !== folderSerial || !folderNew) return;
       var wait = 450 - (Date.now() - syncShownAt);
@@ -1420,12 +1454,12 @@
         if (serial !== folderSerial) return;
         if (ok) { showSync('confirmed'); return; }
         showSync('idle');
-        if (quiet || !stored || syncWarned) return;
+        if ((quiet && !flush) || !stored || syncWarned) return;
         syncWarned = true;
         toast('Đã lưu trên trình duyệt. Chưa ghi được file JSON trong thư mục. Hãy chọn thư mục Index local một lần để lần sau ghi thẳng và hiện confirmed.');
       }, wait);
     }).catch(function () {
-      if (serial !== folderSerial || !folderNew || quiet) return;
+      if (serial !== folderSerial || !folderNew || (quiet && !flush)) return;
       showSync('idle');
     });
     return true;
@@ -1870,7 +1904,7 @@
     var acc = currentAccount();
     if (!acc) return;
     if (popupItems(new Date()).length) {
-      save({ quiet: true });
+      save({ quiet: true, flush: true });
       paintGate();
       return;
     }
@@ -1879,7 +1913,7 @@
     acc.popupPrimed = true;
     var box = document.getElementById('gatebox');
     if (box) { box.classList.add('hidden'); box.innerHTML = ''; }
-    save({ quiet: true });
+    save({ quiet: true, flush: true });
   }
 
   function confirmGate(id) {
@@ -2695,7 +2729,7 @@
     ui.profileEdit = false;
     function finish(message) {
       ui.photoPending = null;
-      save();
+      save({ flush: true });
       toast(message);
       render();
     }
@@ -2705,6 +2739,25 @@
       if (pending.url) URL.revokeObjectURL(pending.url);
       finish(result.disk ? 'Đã lưu hồ sơ và ảnh trong thư mục student-photos.' : 'Đã lưu hồ sơ. Ảnh nằm trên trình duyệt cho đến khi cấp quyền thư mục Index local.');
     });
+  }
+
+  function studentInputOpen(cls, stu) {
+    if (!stu) return false;
+    if (stu.status === 'stopped') return false;
+    if (stu.expireKind === 'stop' || stu.expireKind === 'outdated') return false;
+    var phase = L.studentPhase(cls, stu, new Date());
+    return phase.kind === 'listed';
+  }
+
+  function careWeekNow() {
+    var month = careMonthKey();
+    var weeks = monthWeeks(month);
+    var todayMonday = L.isoDay(L.weekMonday(new Date()));
+    var found = null;
+    weeks.forEach(function (week) {
+      if (week.iso === todayMonday) found = week;
+    });
+    return { month: month, week: found || weeks[weeks.length - 1] || null };
   }
 
   function careMonthKey() {
@@ -2720,6 +2773,13 @@
     return '<button type="button" class="care-cell care-' + status + '" data-act="care-open" data-id="' + esc(stu.id) + '" data-week="' + esc(week.iso) + '" data-label="' + esc(week.label) + '">' +
       esc(spec.label) + bang +
       '<span class="care-tip"><b>' + esc(spec.label) + '</b><span>+' + spec.pct + '%</span><span>' + esc(note) + '</span></span></button>';
+  }
+
+  function careCellStatic(stu, month, week) {
+    var cell = careCellOf(stu, month, week.iso);
+    var status = cell ? cell.status : 'none';
+    var spec = CARE_STATUS[status] || CARE_STATUS.none;
+    return '<span class="care-cell care-' + status + '">' + esc(spec.label) + '</span>';
   }
 
   function rankButton(stu, month) {
@@ -2749,7 +2809,10 @@
     var rows = (cls.students || []).filter(function (stu) {
       return stu && L.studentPhase(cls, stu, now).kind !== 'archive';
     }).map(function (stu) {
-      var cells = weeks.map(function (week) { return '<td>' + careCellButton(stu, month, week) + '</td>'; }).join('');
+      var open = studentInputOpen(cls, stu);
+      var cells = weeks.map(function (week) {
+        return '<td>' + (open ? careCellButton(stu, month, week) : careCellStatic(stu, month, week)) + '</td>';
+      }).join('');
       return '<tr><td>' + esc(showText(stu.name)) + '</td><td>' + esc(showText(stu.code)) + '</td>' + cells + '<td>' + rankButton(stu, month) + '</td></tr>';
     }).join('');
     return shell('<div class="section-head"><div><span class="nav-pair"><button type="button" class="btn" data-act="care-back">← Danh sách lớp</button>' + homeButton() + '</span><h2>' + esc(L.currentName(cls)) + '</h2>' +
@@ -2790,6 +2853,10 @@
     if (deny(canEdit()) || !ui.modal || ui.modal.type !== 'care-cell') return;
     var found = findStudent(ui.modal.stuId);
     if (!found) return;
+    if (!studentInputOpen(found.cls, found.stu)) {
+      toast('Học viên dừng hoặc out lớp không nhập tương tác.');
+      return;
+    }
     var status = String((document.getElementById('care-status') || {}).value || 'none');
     if (!CARE_STATUS[status]) status = 'none';
     var note = String((document.getElementById('care-note') || {}).value || '').trim();
@@ -2807,7 +2874,7 @@
     writeCareCell(found.stu, ui.modal.month, ui.modal.week, status, note);
     ui.modal = null;
     ui.formError = '';
-    save();
+    save({ flush: true });
     toast('Đã lưu tương tác tuần.');
     render();
   }
@@ -2889,6 +2956,7 @@
       if (!stu) return;
       var phase = L.studentPhase(cls, stu, now);
       var has = (stu.remarks || []).some(function (item) { return item && item.sessionKey === sessionKey; });
+      if (!studentInputOpen(cls, stu) && !has) return;
       if (phase.kind === 'archive' && !has) return;
       list.push(stu);
     });
@@ -3051,7 +3119,7 @@
       (stu.englishName ? '<span>' + esc(stu.englishName) + '</span>' : '') +
       '<span>Mã: ' + esc(showText(stu.code)) + '</span>' +
       '<span>' + esc(label) + '</span>' + pill + body +
-      '<button type="button" class="btn remark-revise" data-act="remark-revise" data-class="' + esc(cls.id) + '" data-stu="' + esc(stu.id) + '" data-session="' + esc(ses.key) + '" data-label="' + esc(label) + '">Sửa</button></article>';
+      (studentInputOpen(cls, stu) ? '<button type="button" class="btn remark-revise" data-act="remark-revise" data-class="' + esc(cls.id) + '" data-stu="' + esc(stu.id) + '" data-session="' + esc(ses.key) + '" data-label="' + esc(label) + '">Sửa</button>' : '') + '</article>';
   }
 
   function remarkEditorHtml() {
@@ -3212,7 +3280,7 @@
     if (ses && ses.selectedOptions && ses.selectedOptions[0]) label = ses.selectedOptions[0].getAttribute('data-label') || ses.selectedOptions[0].textContent || label;
     var any = false;
     (cls.students || []).forEach(function (stu) {
-      if (!draft.ticks[stu.id]) return;
+      if (!draft.ticks[stu.id] || !studentInputOpen(cls, stu)) return;
       var text = String(draft.texts[stu.id] || '').trim();
       if (!text) return;
       any = true;
@@ -3223,7 +3291,7 @@
     });
     if (!any) { toast('Chọn học viên và ghi nội dung trước khi xong.'); return; }
     ui.remarkDraft = { classId: cls.id, sessionKey: draft.sessionKey, texts: {}, ticks: {}, editing: false, bulk: '' };
-    save();
+    save({ flush: true });
     toast('Đã lưu nhận xét theo buổi.');
     render();
   }
@@ -3254,6 +3322,7 @@
     var stu = null;
     if (cls) (cls.students || []).forEach(function (item) { if (item && item.id === stuId) stu = item; });
     if (!cls || !stu || !sessionKey) return;
+    if (!studentInputOpen(cls, stu)) { toast('Học viên dừng hoặc out lớp không nhập nhận xét.'); return; }
     var on = document.querySelector('.remark-editor .remark-chip.is-on');
     var tagId = on ? on.getAttribute('data-tag') : (ed.tag || 'uncategorized');
     var spec = remarkTagInfo(tagId) || remarkTagInfo('uncategorized');
@@ -3287,7 +3356,7 @@
     }
     ui.remarkDraft = null;
     ui.remarkEditor = null;
-    save({ quiet: true });
+    save({ quiet: true, flush: true });
     toast('Đã lưu nhận xét.');
     render();
   }
@@ -5141,7 +5210,42 @@
       '<div class="btn-row">' + (studentOps ? '<button type="button" class="btn" data-act="bulk-transfer">Chuyển lớp</button>' : '') +
       (edit ? '<button type="button" class="btn" data-act="bulk-expire">Dừng</button>' : '') +
       (studentOps ? '<button type="button" class="btn btn-danger" data-act="bulk-delete">Xóa học viên</button>' : '') + '</div></div>' : '') +
-      table + stoppedHtml + detailHtml() + modalHtml());
+      table + stoppedHtml + detailHtml() + modalHtml() + remarkEditorHtml());
+  }
+
+  function detailRemarkMini(found) {
+    if (!found || !canEdit() || ui.detailMini !== 'remark' || !studentInputOpen(found.cls, found.stu)) return '';
+    var month = remarkMonthKey();
+    var sessions = found.cls ? remarkSessions(found.cls, month) : [];
+    var picks = sessions.length ? sessions.map(function (ses) {
+      var label = remarkSessionLabel(ses);
+      return '<button type="button" class="btn" data-act="detail-remark-pick" data-class="' + esc(found.cls.id) + '" data-stu="' + esc(found.stu.id) + '" data-session="' + esc(ses.key) + '" data-label="' + esc(label) + '">' + esc(label) + '</button>';
+    }).join('') : '<p class="muted">Lớp không có buổi học trong tháng này.</p>';
+    return '<div class="detail-mini"><label class="field"><span>Tháng nhận xét</span><input id="detail-remark-month" type="month" value="' + esc(month) + '"></label>' +
+      '<p class="field-label">Chọn buổi</p>' + picks + '</div>';
+  }
+
+  function openRemarkEditor(classId, stuId, sessionKey, label) {
+    if (deny(canEdit())) return;
+    var cls = findClass(classId);
+    var stu = null;
+    if (cls) (cls.students || []).forEach(function (item) { if (item && item.id === stuId) stu = item; });
+    if (!cls || !stu || !sessionKey || !studentInputOpen(cls, stu)) {
+      toast('Học viên dừng hoặc out lớp không nhập nhận xét.');
+      return;
+    }
+    var stored = latestRemark(stu, sessionKey);
+    var tag = stored && remarkTagInfo(stored.tag) ? stored.tag : 'uncategorized';
+    ui.remarkEditor = {
+      classId: classId,
+      stuId: stuId,
+      sessionKey: sessionKey,
+      label: label || sessionKey,
+      tag: tag,
+      text: stored ? String(stored.text || '') : ''
+    };
+    ui.detailMini = '';
+    render();
   }
 
   function detailHtml() {
@@ -5209,7 +5313,10 @@
         '<br><b>Mật khẩu PEC:</b> ' + pecPassView + '</p>' + expireLine + noteLine +
         '<p class="field-label">Lịch sử chuyển lớp</p>' + transfers +
         '<p class="field-label">Nhận xét theo tháng</p>' + noteView +
-        '<div class="modal-foot"><button type="button" class="btn" data-act="open-profile" data-id="' + esc(stu.id) + '">Hồ sơ học viên</button>' +
+        detailRemarkMini(found) +
+        '<div class="modal-foot">' +
+        (canEdit() && studentInputOpen(found.cls, stu) ? '<button type="button" class="btn" data-act="detail-care" data-id="' + esc(stu.id) + '">Tương tác</button><button type="button" class="btn" data-act="detail-remark" data-id="' + esc(stu.id) + '">Nhận xét</button>' : '') +
+        '<button type="button" class="btn" data-act="open-profile" data-id="' + esc(stu.id) + '">Hồ sơ học viên</button>' +
         (canEdit() ? '<button type="button" class="btn btn-primary" data-act="edit-detail">Sửa</button>' : '') + '</div>';
     }
     return '<div class="scrim"><div class="detail-card" data-stop role="dialog" aria-label="Thông tin học viên">' +
@@ -7693,7 +7800,7 @@
       Object.keys(payload).forEach(function (key) { found.stu[key] = payload[key]; });
       ui.modal = null;
       ui.formError = '';
-      save();
+      save({ flush: true });
       toast('Đã lưu học viên.');
       render();
       return;
@@ -7751,7 +7858,7 @@
   function finishStudentSave(message) {
     ui.modal = null;
     ui.formError = '';
-    save();
+    save({ flush: true });
     toast(message || 'Đã lưu học viên.');
     render();
   }
@@ -7770,7 +7877,7 @@
     var next = queue.shift();
     ui.modal = { type: 'dup-student', payload: next.payload, hits: next.hits || [], queue: queue };
     ui.formError = '';
-    save();
+    save({ flush: true });
     toast(message);
     render();
   }
@@ -7840,7 +7947,7 @@
       writeCurriculum(found.stu, L.currentLevel(found.cls), bookPatch);
     }
     ui.detailEdit = false;
-    save();
+    save({ flush: true });
     toast('Đã lưu chi tiết học viên.');
     render();
   }
@@ -8991,7 +9098,7 @@
       '<p class="help">' + esc(classNote) + '</p>' +
       '<p class="help">' + esc(dataNote) + '</p>' +
       '<p class="help">' + esc(remarkNote) + '</p>' +
-      '<p class="help">App ghi ocean-edu-classes.json, ocean-edu-data.json và ocean-edu-remarks.json vào thư mục Index local đã chọn. Thẻ nhận xét và nội dung nhận xét nằm ở ocean-edu-remarks.json. Khi có dữ liệu mới ghi vào thư mục, góc trên hiện Token đang xoay với chữ Đang lưu, rồi Token và chữ confirmed khi các file mới đã ghi xong. Lúc mở trang, app đọc ba file này. Nếu quyền thư mục còn đang chờ, lần lưu do người dùng bấm sẽ xin quyền rồi ghi. Chưa chọn thư mục thì dữ liệu nằm trên trình duyệt và không hiện confirmed. GitHub chỉ phục vụ file đã đăng, máy khác thấy dữ liệu mới sau khi thư mục được đăng lại.</p>' +
+      '<p class="help">App ghi ocean-edu-classes.json, ocean-edu-data.json và ocean-edu-remarks.json vào thư mục Index local đã chọn. Học viên, nhận xét tháng, tương tác và nhận xét buổi nằm trong file data và file lớp, nên chép cả thư mục sang chỗ khác vẫn thấy. File ocean-edu-remarks.json giữ riêng mục L. Khi có dữ liệu mới ghi vào thư mục, góc trên hiện Token đang xoay với chữ Đang lưu, rồi Token và chữ confirmed khi các file mới đã ghi xong. Confirm cũng ghi ngày vào file data và ghi mục L. Ngày và sổ không lưu trong file HTML. Nếu quyền thư mục còn đang chờ, lần bấm lưu sẽ xin quyền ngay rồi ghi. Chưa chọn thư mục thì dữ liệu nằm trên trình duyệt và không hiện confirmed.</p>' +
       '<div class="btn-row"><button type="button" class="btn btn-primary" data-act="download-classes">Tải ocean-edu-classes.json</button>' +
       '<button type="button" class="btn" data-act="download-data">Tải ocean-edu-data.json</button>' +
       '<button type="button" class="btn" data-act="download-remarks">Tải ocean-edu-remarks.json</button>' +
@@ -9000,14 +9107,14 @@
 
   function downloadClasses() {
     if (deny(canEdit())) return;
-    var blob = new Blob([JSON.stringify(classBookPayload(), remarkOmit)], { type: 'application/json' });
+    var blob = new Blob([JSON.stringify(classBookPayload())], { type: 'application/json' });
     downloadBlob(blob, CLASS_FILE);
     toast('Đã tạo ocean-edu-classes.json. Chép file vào thư mục Index local, cạnh index.html, để đồng bộ lớp, học viên và chuyên cần.');
   }
 
   function downloadData() {
     if (deny(canEdit())) return;
-    var blob = new Blob([JSON.stringify(dataPayload(), remarkOmit)], { type: 'application/json' });
+    var blob = new Blob([JSON.stringify(dataPayload())], { type: 'application/json' });
     downloadBlob(blob, DATA_FILE);
     toast('Đã tạo ocean-edu-data.json. File này giữ tài khoản, thông báo và cả sổ lớp.');
   }
@@ -9174,7 +9281,7 @@
     if (e.target.id === 'settingsbox') closeSettings();
     if (e.target.classList && e.target.classList.contains('scrim')) {
       if (e.target.classList.contains('remark-scrim')) { ui.remarkEditor = null; render(); return; }
-      if (ui.detailId && !ui.modal) { ui.detailId = null; ui.detailEdit = false; render(); releasePending(); return; }
+      if (ui.detailId && !ui.modal) { ui.detailId = null; ui.detailEdit = false; ui.detailMini = ''; render(); releasePending(); return; }
       if (ui.modal) { ui.modal = null; ui.formError = ''; ui.importDraft = null; render(); releasePending(); }
       return;
     }
@@ -9194,6 +9301,7 @@
       'code-save': 1, 'care-save': 1, 'profile-save': 1, 'profile-edit': 1, 'photo-url': 1,
       'remark-confirm': 1, 'remark-edit': 1, 'remark-done': 1, 'remark-pick': 1, 'remark-save': 1,
       'remark-revise': 1, 'remark-style': 1, 'remark-revise-close': 1,
+      'detail-care': 1, 'detail-remark': 1, 'detail-remark-pick': 1,
       'dup-transfer': 1, 'dup-skip': 1,
       'book-fold': 1, 'book-set': 1, 'book-message': 1, 'copy-report': 1, 'transfer-report-yes': 1,
       'past-book-open': 1, 'past-book-add': 1, 'past-book-remove': 1, 'past-book-save': 1, 'past-book-standard': 1, 'past-book-cancel': 1
@@ -9409,24 +9517,7 @@
       return;
     }
     if (act === 'remark-revise') {
-      if (deny(canEdit())) return;
-      var revClass = btn.getAttribute('data-class') || '';
-      var revStu = btn.getAttribute('data-stu') || '';
-      var revSession = btn.getAttribute('data-session') || '';
-      var revHost = findClass(revClass);
-      var revWho = null;
-      if (revHost) (revHost.students || []).forEach(function (stu) { if (stu && stu.id === revStu) revWho = stu; });
-      var revStored = latestRemark(revWho, revSession);
-      var revTag = revStored && remarkTagInfo(revStored.tag) ? revStored.tag : 'uncategorized';
-      ui.remarkEditor = {
-        classId: revClass,
-        stuId: revStu,
-        sessionKey: revSession,
-        label: btn.getAttribute('data-label') || revSession,
-        tag: revTag,
-        text: revStored ? String(revStored.text || '') : ''
-      };
-      render();
+      openRemarkEditor(btn.getAttribute('data-class') || '', btn.getAttribute('data-stu') || '', btn.getAttribute('data-session') || '', btn.getAttribute('data-label') || '');
       return;
     }
     if (act === 'remark-revise-close') {
@@ -9642,8 +9733,37 @@
     if (act === 'run-hw-import') { runHomeworkImport(); return; }
     if (act === 'download-hw-template') { downloadHomeworkTemplate(); return; }
     if (act === 'edit-student') { ui.formError = ''; ui.modal = { type: 'edit-student', id: btn.getAttribute('data-id') }; render(); return; }
-    if (act === 'open-student') { ui.detailId = btn.getAttribute('data-id'); ui.detailEdit = false; render(); return; }
-    if (act === 'close-detail') { ui.detailId = null; ui.detailEdit = false; render(); releasePending(); return; }
+    if (act === 'open-student') { ui.detailId = btn.getAttribute('data-id'); ui.detailEdit = false; ui.detailMini = ''; render(); return; }
+    if (act === 'close-detail') { ui.detailId = null; ui.detailEdit = false; ui.detailMini = ''; render(); releasePending(); return; }
+    if (act === 'detail-care') {
+      var careFound = findStudent(btn.getAttribute('data-id') || ui.detailId);
+      if (!careFound || !studentInputOpen(careFound.cls, careFound.stu)) {
+        toast('Học viên dừng hoặc out lớp không nhập tương tác.');
+        return;
+      }
+      var careNow = careWeekNow();
+      if (!careNow.week) { toast('Tháng này chưa có tuần để tương tác.'); return; }
+      ui.careMonth = careNow.month;
+      ui.formError = '';
+      ui.modal = { type: 'care-cell', stuId: careFound.stu.id, month: careNow.month, week: careNow.week.iso, weekLabel: careNow.week.label };
+      render();
+      return;
+    }
+    if (act === 'detail-remark') {
+      var remarkFound = findStudent(btn.getAttribute('data-id') || ui.detailId);
+      if (!remarkFound || !studentInputOpen(remarkFound.cls, remarkFound.stu)) {
+        toast('Học viên dừng hoặc out lớp không nhập nhận xét.');
+        return;
+      }
+      ui.detailMini = ui.detailMini === 'remark' ? '' : 'remark';
+      if (!ui.remarkMonth) ui.remarkMonth = L.monthKey(new Date());
+      render();
+      return;
+    }
+    if (act === 'detail-remark-pick') {
+      openRemarkEditor(btn.getAttribute('data-class') || '', btn.getAttribute('data-stu') || '', btn.getAttribute('data-session') || '', btn.getAttribute('data-label') || '');
+      return;
+    }
     if (act === 'edit-detail') { ui.detailEdit = true; render(); return; }
     if (act === 'cancel-detail') { ui.detailEdit = false; render(); releasePending(); return; }
     if (act === 'save-detail') { saveDetail(); return; }
@@ -10181,6 +10301,11 @@
     }
     if (t.id === 'photo-file' && t.files && t.files[0]) {
       takePhotoFile(t.files[0]);
+      return;
+    }
+    if (t.id === 'detail-remark-month') {
+      ui.remarkMonth = t.value;
+      render();
       return;
     }
     if (t.id === 'remark-month') {
