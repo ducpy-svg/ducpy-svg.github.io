@@ -839,27 +839,21 @@
   function studentPhase(cls, stu, now) {
     var when = now instanceof Date ? now : new Date(now);
     if (!stu) return { kind: 'listed', tag: 'official', reason: '', expiredAt: null, until: null };
-    if ((stu.expireKind === 'stop' || stu.expireKind === 'outdated') && stu.expiredAt) {
+    if (stu.expireKind === 'stop' || (stu.status === 'stopped' && stu.expireKind !== 'outdated')) {
+      var goneAt = new Date(stu.expiredAt || stu.stoppedAt || when);
+      if (isNaN(goneAt.getTime())) goneAt = when;
+      var goneReason = stu.expireReason || 'Dừng học';
+      return { kind: 'archive', tag: 'stop', reason: goneReason, expiredAt: goneAt, until: goneAt };
+    }
+    if (stu.expireKind === 'outdated' && stu.expiredAt) {
       var stopAt = new Date(stu.expiredAt);
       var stopUntil = addDays(stopAt, 7);
-      var stopReason = stu.expireReason || (stu.expireKind === 'outdated' ? 'Học viên outdated' : 'Dừng');
-      var stopTag = stu.expireKind === 'outdated' ? 'outdated' : 'stop';
+      var stopReason = stu.expireReason || 'Học viên outdated';
       if (!isNaN(stopAt.getTime()) && when.getTime() >= stopUntil.getTime()) {
-        return { kind: 'archive', tag: stopTag, reason: stopReason, expiredAt: stopAt, until: stopUntil };
+        return { kind: 'archive', tag: 'outdated', reason: stopReason, expiredAt: stopAt, until: stopUntil };
       }
       if (!isNaN(stopAt.getTime())) {
-        return { kind: 'gray', tag: stopTag, reason: stopReason, expiredAt: stopAt, until: stopUntil };
-      }
-    }
-    if (stu.status === 'stopped' && stu.stoppedAt) {
-      var heldAt = new Date(stu.stoppedAt);
-      var heldUntil = addDays(heldAt, 7);
-      var heldReason = stu.expireReason || 'Dừng học';
-      if (!isNaN(heldAt.getTime()) && when.getTime() >= heldUntil.getTime()) {
-        return { kind: 'archive', tag: 'stop', reason: heldReason, expiredAt: heldAt, until: heldUntil };
-      }
-      if (!isNaN(heldAt.getTime())) {
-        return { kind: 'gray', tag: 'stop', reason: heldReason, expiredAt: heldAt, until: heldUntil };
+        return { kind: 'gray', tag: 'outdated', reason: stopReason, expiredAt: stopAt, until: stopUntil };
       }
     }
     var enroll = enrollOf(stu);
@@ -962,6 +956,42 @@
     return String((a && a.gradeId) || '') === String((b && b.gradeId) || '');
   }
 
+  function cloneBookBag(bag) {
+    var norm = normalizeBook(bag || {});
+    return {
+      bookStatus: norm.bookStatus,
+      bookStatusAt: norm.bookStatusAt || '',
+      books: (norm.books || []).map(function (item) {
+        return { status: item.status, statusAt: item.statusAt || '' };
+      }),
+      pecMode: norm.pecMode || '',
+      pecUser: norm.pecUser || '',
+      pecPass: norm.pecPass || ''
+    };
+  }
+
+  function carryCurrentLevel(stu, fromCls, toCls) {
+    if (!stu || !fromCls || !toCls) return;
+    var fromLevel = currentLevel(fromCls);
+    var toLevel = currentLevel(toCls);
+    if (!fromLevel || !toLevel || fromLevel.to) return;
+    var fromKey = levelKey(fromLevel);
+    var toKey = levelKey(toLevel);
+    if (!fromKey || !toKey) return;
+    if (!stu.curriculum || typeof stu.curriculum !== 'object' || Array.isArray(stu.curriculum)) stu.curriculum = {};
+    var source = stu.curriculum[fromKey];
+    if (!source && (stu.bookStatus || stu.pecMode || stu.pecUser || stu.pecPass)) {
+      source = { bookStatus: stu.bookStatus, pecMode: stu.pecMode, pecUser: stu.pecUser, pecPass: stu.pecPass };
+    }
+    if (!source) return;
+    if (fromKey !== toKey) stu.curriculum[toKey] = cloneBookBag(source);
+    var mirrored = cloneBookBag(stu.curriculum[toKey] || source);
+    stu.bookStatus = mirrored.bookStatus;
+    stu.pecMode = mirrored.pecMode;
+    stu.pecUser = mirrored.pecUser;
+    stu.pecPass = mirrored.pecPass;
+  }
+
   function transferStudents(state, fromId, toId, studentIds, now) {
     var from = null;
     var to = null;
@@ -1006,6 +1036,7 @@
         at: when.toISOString()
       });
       to.students.push(stu);
+      carryCurrentLevel(stu, from, to);
       moved.push(stu.id);
     });
     var levelGap = !sameLevel(from, to);
@@ -1509,7 +1540,8 @@
     none: { label: 'NONE', score: 0 },
     miss: { label: 'MISS', score: 0.5 },
     absent: { label: 'ABSENT', score: 0 },
-    applied: { label: 'APPLIED', score: 1 }
+    applied: { label: 'APPLIED', score: 1 },
+    test: { label: 'TEST', score: 1 }
   };
 
   function levelsInMonth(cls, key) {
@@ -1606,7 +1638,9 @@
   var BOOK_STATUS = [
     { id: 'not-bought', label: 'Chưa mua' },
     { id: 'issued-paid', label: 'Đã phát và đóng' },
-    { id: 'issued-unpaid', label: 'Đã phát-Chưa thanh toán' }
+    { id: 'issued-unpaid', label: 'Đã phát-Chưa thanh toán' },
+    { id: 'closed-unissued', label: 'Đã đóng, chưa phát' },
+    { id: 'already-have', label: 'Đã có' }
   ];
 
   function levelKey(level) {
@@ -1615,7 +1649,7 @@
   }
 
   function cleanBookStatus(value) {
-    if (value === 'issued-paid' || value === 'issued-unpaid' || value === 'not-bought') return value;
+    if (value === 'issued-paid' || value === 'issued-unpaid' || value === 'not-bought' || value === 'closed-unissued' || value === 'already-have') return value;
     return 'not-bought';
   }
 
@@ -1662,9 +1696,9 @@
     var books = rec.books || [];
     for (var i = 0; i < books.length; i++) {
       var status = books[i] && books[i].status;
-      if (status === 'issued-paid' || status === 'issued-unpaid') return true;
+      if (status === 'issued-paid' || status === 'issued-unpaid' || status === 'already-have') return true;
     }
-    return rec.bookStatus === 'issued-paid' || rec.bookStatus === 'issued-unpaid';
+    return rec.bookStatus === 'issued-paid' || rec.bookStatus === 'issued-unpaid' || rec.bookStatus === 'already-have';
   }
 
   function inMonth(iso, key) {
@@ -1682,6 +1716,7 @@
     var unpaidRevenue = 0;
     var debtBooks = 0;
     var debtRevenue = 0;
+    var pending = [];
     var byCm = {};
     (classes || []).forEach(function (cls) {
       var cmName = String(cls && cls.cm || '').trim() || '?';
@@ -1715,6 +1750,13 @@
               bucket.debtBooks += 1;
               bucket.debtRevenue += book.price;
             }
+            if (slot.status === 'closed-unissued') {
+              pending.push({
+                name: String(stu && stu.name || '').trim(),
+                className: currentName(cls),
+                bookName: String(book && book.name || '').trim()
+              });
+            }
             if (!inMonth(slot.statusAt, key)) return;
             if (slot.status === 'issued-paid') {
               soldBooks += 1;
@@ -1738,6 +1780,13 @@
     });
     var cms = Object.keys(byCm).map(function (name) { return byCm[name]; });
     cms.sort(function (a, b) { return a.cm.localeCompare(b.cm, 'vi'); });
+    pending.sort(function (a, b) {
+      var byClass = String(a.className || '').localeCompare(String(b.className || ''), 'vi');
+      if (byClass) return byClass;
+      var byName = String(a.name || '').localeCompare(String(b.name || ''), 'vi');
+      if (byName) return byName;
+      return String(a.bookName || '').localeCompare(String(b.bookName || ''), 'vi');
+    });
     return {
       soldStudents: soldStudents,
       soldBooks: soldBooks,
@@ -1746,6 +1795,7 @@
       unpaidRevenue: unpaidRevenue,
       debtBooks: debtBooks,
       debtRevenue: debtRevenue,
+      pending: pending,
       cms: cms
     };
   }
@@ -2489,6 +2539,7 @@
     if (text === 'MISS') return 'miss';
     if (text === 'ABSENT') return 'absent';
     if (text === 'APPLIED') return 'applied';
+    if (text === 'TEST') return 'test';
     return null;
   }
 

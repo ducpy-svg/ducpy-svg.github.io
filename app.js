@@ -2,7 +2,7 @@
   'use strict';
 
   var L = window.OceanLogic;
-  var APP_TITLE = 'Ocean EDU - Student management list (Unofficial) ver 1.5.11';
+  var APP_TITLE = 'Ocean EDU - Student management list (Unofficial) ver 1.6.0';
   var SUGGEST_URL = 'https://script.google.com/macros/s/AKfycbyNFHdMszhrmqyfXDHSDi2ti51y5_Ib3kiXgA5cGzcPkWLboUJSnPYJ5xwikb9N-fLOkg/exec';
   var PRIMARY_IDS = ['ocean', 'sky', 'teal', 'green', 'lime', 'amber', 'orange', 'coral', 'rose', 'violet', 'indigo', 'slate'];
   var SKIN_BOOK = [
@@ -147,6 +147,7 @@
     curriculumLevel: '',
     curriculumMonth: '',
     curriculumCmOpen: false,
+    curriculumPendingOpen: false,
     curriculumLayout: 'cards',
     curriculumSort: 'level',
     curriculumQuery: '',
@@ -171,6 +172,8 @@
     classLayout: 'cards',
     classSort: 'level',
     classQuery: '',
+    classMulti: false,
+    classPick: {},
     dict: { query: '', status: '', message: '', tab: 'mean', entry: null, suggestions: [], sentence: '', sentenceVi: '', sentenceStatus: '', sentencePair: '' },
     pastBookEdit: '',
     pastBookDraft: null,
@@ -197,7 +200,8 @@
     remarkDraft: null,
     remarkReadId: '',
     remarkSlip: '',
-    remarkEditor: null
+    remarkEditor: null,
+    remarkPick: {}
   };
   var scrollLatch = { key: '' };
 
@@ -207,7 +211,8 @@
     { id: 'redo', en: 'Unfinished', vi: 'Thiếu bài/ làm lại bài', comment: true },
     { id: 'issue', en: 'Issue', vi: 'Có vấn đề', comment: true },
     { id: 'incomplete', en: 'Unfinished', vi: 'Chưa hoàn thành bài tập', comment: true },
-    { id: 'absent', en: 'Absent', vi: 'Vắng mặt', comment: false },
+    { id: 'absent', en: 'Absent', vi: 'Vắng mặt', comment: 'optional' },
+    { id: 'test', en: 'Test', vi: 'Bài kiểm tra', comment: true },
     { id: 'uncategorized', en: 'Uncategorized', vi: 'Chưa nhận xét', comment: false }
   ];
 
@@ -226,6 +231,8 @@
     { id: 'CM', name: 'Class Manager' },
     { id: 'EC', name: 'Educational Consultant' },
     { id: 'FET', name: 'Foreign English Teacher' },
+    { id: 'TA', name: 'Teaching Assistant' },
+    { id: 'BSA', name: 'BSA' },
     { id: 'BM', name: 'Branch Manager' },
     { id: 'BAM', name: 'Branch Administrative Manager' },
     { id: 'FBM', name: 'Floating Branch Manager' },
@@ -335,7 +342,10 @@
         'Ocean EDU - Student management list (Unofficial) ver 1.5.7',
         'Ocean EDU - Student management list (Unofficial) ver 1.5.8',
         'Ocean EDU - Student management list (Unofficial) ver 1.5.9',
-        'Ocean EDU - Student management list (Unofficial) ver 1.5.10'
+        'Ocean EDU - Student management list (Unofficial) ver 1.5.10',
+        'Ocean EDU - Student management list (Unofficial) ver 1.5.11',
+        'Ocean EDU - Student management list (Unofficial) ver 1.5.12',
+        'Ocean EDU - Student management list (Unofficial) ver 1.5.13'
       ];
       if (!state.settings.title || legacyTitle.indexOf(state.settings.title) >= 0) state.settings.title = APP_TITLE;
       delete state.settings.supabaseUrl;
@@ -359,7 +369,7 @@
       state.accounts.forEach(function (acc) {
         if (!acc || typeof acc !== 'object') return;
         var role = String(acc.role || '').toLowerCase();
-        acc.role = role === 'admin' || role === 'commenter' || role === 'guest' ? role : 'guest';
+        acc.role = role === 'admin' || role === 'commenter' || role === 'guest' || role === 'bsa' ? role : 'guest';
         if (!acc.id) acc.id = L.uid();
         if (acc.role === 'guest') acc.password = '';
         else acc.password = acc.password == null ? '' : String(acc.password);
@@ -1467,8 +1477,15 @@
 
   function roleKey() {
     var role = ui.user && ui.user.role ? String(ui.user.role).toLowerCase() : '';
-    if (role === 'admin' || role === 'commenter' || role === 'guest') return role;
+    if (role === 'admin' || role === 'commenter' || role === 'guest' || role === 'bsa') return role;
     return ui.user ? 'guest' : '';
+  }
+
+  function isBsa() { return roleKey() === 'bsa'; }
+
+  function screenAllowed(screen) {
+    if (!isBsa()) return true;
+    return screen === 'menu' || screen === 'classes' || screen === 'class' || screen === 'curriculum' || screen === 'personnel' || screen === 'care' || screen === 'remarks' || screen === 'remark-read';
   }
 
   function canEdit() { return roleKey() === 'admin'; }
@@ -1524,6 +1541,7 @@
   function roleLabel(role) {
     if (role === 'admin') return 'ADMIN';
     if (role === 'commenter') return 'COMMENTER';
+    if (role === 'bsa') return 'BSA';
     return 'GUEST';
   }
 
@@ -2233,7 +2251,7 @@
       '<label class="field"><span>Username</span><input name="username" autocomplete="username" required value="' + esc(memory ? memory.username : '') + '"></label>' +
       '<label class="field"><span>Mật khẩu</span><input name="password" type="password" autocomplete="current-password" value="' + esc(memory ? memory.password : '') + '"></label>' +
       '<label class="checkline"><input type="checkbox" name="remember" id="login-remember"' + (memory ? ' checked' : '') + '> Ghi nhớ mật khẩu trên thiết bị</label>' +
-      '<p class="help">Admin và Commenter nhập mật khẩu. Guest chỉ điền Username và để trống mật khẩu. Ghi nhớ mật khẩu chỉ lưu trên thiết bị này, không ghi vào file lớp.</p>' +
+      '<p class="help">Admin, Commenter và BSA nhập mật khẩu. Guest chỉ điền Username và để trống mật khẩu. Ghi nhớ mật khẩu chỉ lưu trên thiết bị này, không ghi vào file lớp.</p>' +
       '<p class="form-error" role="alert">' + esc(ui.loginError) + '</p>' +
       '<button class="btn btn-primary" type="submit">Đăng nhập</button></form></div>';
   }
@@ -2378,7 +2396,7 @@
   }
 
   function normalizeRemarks(list) {
-    var keepTag = { finished: 1, redo: 1, issue: 1, incomplete: 1, absent: 1 };
+    var keepTag = { finished: 1, redo: 1, issue: 1, incomplete: 1, absent: 1, test: 1 };
     return (Array.isArray(list) ? list : []).filter(function (item) {
       if (!item || !item.id) return false;
       var text = String(item.text || '').trim();
@@ -3115,11 +3133,15 @@
     var label = remarkSessionLabel(ses);
     var pill = tag ? '<span class="remark-pill tag-' + tag.id + '">' + esc(tag.en) + '<small>' + esc(tag.vi) + '</small></span>' : '';
     var body = stored ? remarkDetailHtml(stored.text, tag) : '<p class="muted">Chưa có nhận xét.</p>';
-    return '<article class="' + remarkNoteClass(cls, tagId) + '" data-stu="' + esc(stu.id) + '"><strong>' + esc(showText(stu.name)) + '</strong>' +
+    var open = studentInputOpen(cls, stu);
+    var pick = open
+      ? '<label class="remark-pick"><input type="checkbox" data-remark-pick="' + esc(stu.id) + '"' + (ui.remarkPick[stu.id] ? ' checked' : '') + '> Chọn</label>'
+      : '';
+    return '<article class="' + remarkNoteClass(cls, tagId) + '" data-stu="' + esc(stu.id) + '">' + pick + '<strong>' + esc(showText(stu.name)) + '</strong>' +
       (stu.englishName ? '<span>' + esc(stu.englishName) + '</span>' : '') +
       '<span>Mã: ' + esc(showText(stu.code)) + '</span>' +
       '<span>' + esc(label) + '</span>' + pill + body +
-      (studentInputOpen(cls, stu) ? '<button type="button" class="btn remark-revise" data-act="remark-revise" data-class="' + esc(cls.id) + '" data-stu="' + esc(stu.id) + '" data-session="' + esc(ses.key) + '" data-label="' + esc(label) + '">Sửa</button>' : '') + '</article>';
+      (open ? '<button type="button" class="btn remark-revise" data-act="remark-revise" data-class="' + esc(cls.id) + '" data-stu="' + esc(stu.id) + '" data-session="' + esc(ses.key) + '" data-label="' + esc(label) + '">Sửa</button>' : '') + '</article>';
   }
 
   function remarkEditorHtml() {
@@ -3127,23 +3149,31 @@
     if (!ed || !canEdit()) return '';
     var spec = remarkTagInfo(ed.tag) || remarkTagInfo('uncategorized');
     var cls = findClass(ed.classId);
-    var stu = null;
-    if (cls) (cls.students || []).forEach(function (item) { if (item && item.id === ed.stuId) stu = item; });
+    var ids = ed.stuIds && ed.stuIds.length ? ed.stuIds : (ed.stuId ? [ed.stuId] : []);
     var chips = REMARK_TAGS.map(function (item) {
       var on = item.id === spec.id ? ' is-on' : '';
       return '<button type="button" class="remark-chip tag-' + item.id + on + '" data-act="remark-pick" data-tag="' + item.id + '">' +
         esc(item.en) + '<small>' + esc(item.vi) + '</small></button>';
     }).join('');
-    var editable = spec.comment ? 'true' : 'false';
-    var lock = spec.comment ? '' : ' disabled';
+    var writable = remarkCommentOn(spec);
+    var editable = writable ? 'true' : 'false';
+    var lock = writable ? '' : ' disabled';
     var html = remarkToEditorHtml(ed.text);
-    var who = stu
-      ? '<p><strong>' + esc(showText(stu.name)) + '</strong>' +
-        (stu.englishName ? ' · ' + esc(stu.englishName) : '') +
-        ' · Mã: ' + esc(showText(stu.code)) + '</p>'
-      : '';
-    return '<div class="scrim remark-scrim"><div class="modal remark-editor" data-stop data-scroll-keep="remark-editor" role="dialog" aria-label="Sửa nhận xét">' +
-      '<div class="dialog-head"><h2>Sửa nhận xét</h2><button type="button" class="icon-x" data-act="remark-revise-close" aria-label="Đóng">X</button></div>' +
+    var who = '';
+    var heading = ids.length > 1 ? 'Gán chung' : 'Sửa nhận xét';
+    if (ids.length > 1) {
+      who = '<p><strong>Gán chung</strong> · ' + ids.length + ' học viên</p>';
+    } else if (ids.length === 1 && cls) {
+      var stu = null;
+      (cls.students || []).forEach(function (item) { if (item && item.id === ids[0]) stu = item; });
+      if (stu) {
+        who = '<p><strong>' + esc(showText(stu.name)) + '</strong>' +
+          (stu.englishName ? ' · ' + esc(stu.englishName) : '') +
+          ' · Mã: ' + esc(showText(stu.code)) + '</p>';
+      }
+    }
+    return '<div class="scrim remark-scrim"><div class="modal remark-editor" data-stop data-scroll-keep="remark-editor" role="dialog" aria-label="' + heading + '">' +
+      '<div class="dialog-head"><h2>' + heading + '</h2><button type="button" class="icon-x" data-act="remark-revise-close" aria-label="Đóng">X</button></div>' +
       who +
       '<p>' + esc(ed.label || '') + '</p>' +
       '<div class="remark-chips">' + chips + '</div>' +
@@ -3152,9 +3182,9 @@
         '<button type="button" class="btn remark-bold" data-act="remark-style" data-style="bold"' + lock + '>B</button>' +
         '<button type="button" class="btn remark-under" data-act="remark-style" data-style="underline"' + lock + '>U</button>' +
       '</div>' +
-      '<p class="help">Bôi đen chữ, rồi bấm I, B, U hoặc Ctrl+I, Ctrl+B, Ctrl+U. Enter để xuống dòng.</p>' +
+      '<p class="help">Bôi đen chữ, rồi bấm I, B, U hoặc Ctrl+I, Ctrl+B, Ctrl+U. Enter để xuống dòng. Absent viết được và để trống vẫn lưu. Test bắt buộc có nhận xét.</p>' +
       '<div id="remark-composer" class="remark-detail remark-composer" data-scroll-keep="remark-composer" contenteditable="' + editable + '" role="textbox" aria-multiline="true"' +
-        (spec.comment ? '' : ' aria-disabled="true"') + '>' + html + '</div>' +
+        (writable ? '' : ' aria-disabled="true"') + '>' + html + '</div>' +
       '<div class="modal-foot"><button type="button" class="btn btn-primary" data-act="remark-save">Lưu thẻ</button>' +
       '<button type="button" class="btn" data-act="remark-revise-close">Hủy</button></div></div></div>';
   }
@@ -3183,7 +3213,7 @@
   }
 
   function remarkLegendHtml() {
-    return '<section class="remark-admin"><h3>Khung nhận xét</h3><p class="help">Mỗi học viên một thẻ ghi chú. Bấm Sửa, chọn thẻ, rồi Lưu thẻ. Cửa sổ hiện đủ nhận xét, giữ cách dòng và xuống dòng. Bôi đen chữ rồi bấm I, B, U hoặc Ctrl+I, Ctrl+B, Ctrl+U. Absent và Uncategorized không nhập được nhận xét.</p><div class="remark-legend">' +
+    return '<section class="remark-admin"><h3>Khung nhận xét</h3><p class="help">Mỗi học viên một thẻ ghi chú. Bấm Sửa, chọn thẻ, rồi Lưu thẻ. Tick nhiều thẻ, hoặc Chọn toàn bộ, rồi Gán chung để ghi cùng một nhận xét. Cửa sổ hiện đủ nhận xét, giữ cách dòng và xuống dòng. Bôi đen chữ rồi bấm I, B, U hoặc Ctrl+I, Ctrl+B, Ctrl+U. Absent viết được và được để trống. Test bắt buộc có nhận xét. Uncategorized xóa nhận xét buổi đó. Homework finished ghi DONE, Unfinished xanh ghi MISS, Absent ghi ABSENT, Test ghi TEST vào chuyên cần và tính 100%. Issue và Unfinished đỏ không ghi chuyên cần.</p><div class="remark-legend">' +
       REMARK_TAGS.map(function (item) {
         return '<span class="remark-pill tag-' + item.id + '">' + esc(item.en) + '<small>' + esc(item.vi) + '</small></span>';
       }).join('') + '</div></section>';
@@ -3209,7 +3239,8 @@
     return shell('<div class="section-head"><div><span class="nav-pair"><button type="button" class="btn" data-act="remark-back">← Danh sách lớp</button>' + homeButton() + '</span><h2>' + esc(L.currentName(cls)) + '</h2></div></div>' +
       '<label class="field dash-month"><span>Tháng</span><input id="remark-month" type="month" value="' + esc(month) + '"></label>' +
       '<label class="field"><span>Buổi nhận xét</span><select id="remark-session-pick">' + options + '</select></label>' +
-      '<p class="help">Thẻ học viên theo buổi đang chọn. Bấm Sửa để mở cửa sổ và xem đủ nhận xét. Đổi buổi trong ô phía trên. Ngăn rút gọn chỉ gồm danh sách học viên.</p>' +
+      '<p class="help">Thẻ học viên theo buổi đang chọn. Bấm Sửa để mở cửa sổ và xem đủ nhận xét. Tick nhiều thẻ hoặc bấm Chọn toàn bộ, rồi Gán chung. Đổi buổi trong ô phía trên. Ngăn rút gọn chỉ gồm danh sách học viên.</p>' +
+      (sessions.length ? '<div class="btn-row remark-bulk-row"><button type="button" class="btn" data-act="remark-select-all">Chọn toàn bộ</button><button type="button" class="btn btn-primary" data-act="remark-assign">Gán chung</button></div>' : '') +
       remarkLegendHtml() +
       fileExportButtons('export-remarks') +
       (canExportClasses() ? '<p class="help">Xuất nhận xét đã lưu của lớp này.</p>' : '') +
@@ -3310,100 +3341,135 @@
     render();
   }
 
+  function remarkCommentOn(spec) {
+    return !!(spec && (spec.comment === true || spec.comment === 'optional'));
+  }
+
+  var REMARK_ATTEND = { finished: 'done', redo: 'miss', absent: 'absent', test: 'test' };
+
+  function syncRemarkAttend(stu, sessionKey, previousTag, nextTag) {
+    if (!stu || !sessionKey) return;
+    var next = REMARK_ATTEND[nextTag] || '';
+    if (next) {
+      if (!stu.homework || typeof stu.homework !== 'object') stu.homework = {};
+      stu.homework[sessionKey] = next;
+      return;
+    }
+    if (nextTag !== 'uncategorized') return;
+    var prev = REMARK_ATTEND[previousTag] || '';
+    if (!prev || !stu.homework || stu.homework[sessionKey] !== prev) return;
+    delete stu.homework[sessionKey];
+  }
+
+  function applyRemarkMark(stu, sessionKey, label, spec, text, remarkedAt) {
+    var previous = latestRemark(stu, sessionKey);
+    var previousTag = previous && previous.tag ? previous.tag : '';
+    if (!Array.isArray(stu.remarks)) stu.remarks = [];
+    stu.remarkAt = remarkedAt;
+    if (spec.id === 'uncategorized') {
+      stu.remarks = stu.remarks.filter(function (item) { return !item || item.sessionKey !== sessionKey; });
+    } else if (previous) {
+      previous.tag = spec.id;
+      previous.text = text;
+      previous.sessionLabel = label;
+      previous.at = remarkedAt;
+      previous.by = ui.user ? ui.user.name : '';
+    } else {
+      stu.remarks.push({
+        id: L.uid(),
+        sessionKey: sessionKey,
+        sessionLabel: label,
+        text: text,
+        tag: spec.id,
+        at: remarkedAt,
+        by: ui.user ? ui.user.name : ''
+      });
+    }
+    syncRemarkAttend(stu, sessionKey, previousTag, spec.id);
+  }
+
   function saveRemarkCard(btn) {
     if (deny(canEdit())) return;
     var ed = ui.remarkEditor;
     if (!ed) return;
     var classId = ed.classId || '';
-    var stuId = ed.stuId || '';
     var sessionKey = ed.sessionKey || '';
     var label = ed.label || sessionKey;
     var cls = findClass(classId);
-    var stu = null;
-    if (cls) (cls.students || []).forEach(function (item) { if (item && item.id === stuId) stu = item; });
-    if (!cls || !stu || !sessionKey) return;
-    if (!studentInputOpen(cls, stu)) { toast('Học viên dừng hoặc out lớp không nhập nhận xét.'); return; }
+    if (!cls || !sessionKey) return;
+    var ids = ed.stuIds && ed.stuIds.length ? ed.stuIds.slice() : (ed.stuId ? [ed.stuId] : []);
+    var students = [];
+    ids.forEach(function (id) {
+      var stu = null;
+      (cls.students || []).forEach(function (item) { if (item && item.id === id) stu = item; });
+      if (stu && studentInputOpen(cls, stu)) students.push(stu);
+    });
+    if (!students.length) { toast('Học viên dừng hoặc out lớp không nhập nhận xét.'); return; }
     var on = document.querySelector('.remark-editor .remark-chip.is-on');
     var tagId = on ? on.getAttribute('data-tag') : (ed.tag || 'uncategorized');
     var spec = remarkTagInfo(tagId) || remarkTagInfo('uncategorized');
     var markup = composerMarkup();
-    var text = spec.comment ? markup : '';
-    if (spec.comment && !remarkToPlain(text)) { toast('Viết nhận xét trước khi lưu.'); return; }
-    if (!Array.isArray(stu.remarks)) stu.remarks = [];
+    var text = remarkCommentOn(spec) ? markup : '';
+    if (spec.comment === true && !remarkToPlain(text)) { toast('Viết nhận xét trước khi lưu.'); return; }
     var remarkedAt = new Date().toISOString();
-    stu.remarkAt = remarkedAt;
-    if (spec.id === 'uncategorized') {
-      stu.remarks = stu.remarks.filter(function (item) { return !item || item.sessionKey !== sessionKey; });
-    } else {
-      var current = latestRemark(stu, sessionKey);
-      if (current) {
-        current.tag = spec.id;
-        current.text = text;
-        current.sessionLabel = label;
-        current.at = remarkedAt;
-        current.by = ui.user ? ui.user.name : '';
-      } else {
-        stu.remarks.push({
-          id: L.uid(),
-          sessionKey: sessionKey,
-          sessionLabel: label,
-          text: text,
-          tag: spec.id,
-          at: remarkedAt,
-          by: ui.user ? ui.user.name : ''
-        });
-      }
-    }
+    students.forEach(function (stu) {
+      applyRemarkMark(stu, sessionKey, label, spec, text, remarkedAt);
+    });
+    ids.forEach(function (id) { delete ui.remarkPick[id]; });
     ui.remarkDraft = null;
     ui.remarkEditor = null;
     save({ quiet: true, flush: true });
-    toast('Đã lưu nhận xét.');
+    toast(students.length > 1 ? 'Đã lưu nhận xét cho ' + students.length + ' học viên.' : 'Đã lưu nhận xét.');
     render();
   }
 
   function viewMenu() {
     var stats = currentWeekStats(null);
-    var menuSpan = 'A–L';
+    var menuSpan = isBsa() ? 'A, F, J, K, L' : 'A–L';
+    function menuCard(screen, html) {
+      if (isBsa() && screen !== 'classes' && screen !== 'curriculum' && screen !== 'personnel' && screen !== 'care' && screen !== 'remarks') return '';
+      return html;
+    }
     return shell(remarkTagHtml() + summaryHtml(stats) + dashboardHtml() +
       '<details class="menu-fold"><summary>Menu chính ' + menuSpan + '</summary><section class="menu-grid">' +
-      '<button type="button" class="menu-card" data-act="nav" data-screen="classes">' + iconClass() +
+      menuCard('classes', '<button type="button" class="menu-card" data-act="nav" data-screen="classes">' + iconClass() +
       '<div class="kicker">A · CLASS INFOS</div><h2>Quản lý lớp</h2>' +
-      '<p>Lớp, học viên, sĩ số. Nút xem chuyên cần nằm trên từng thẻ.</p></button>' +
-      '<button type="button" class="menu-card" data-act="nav" data-screen="schedule">' + iconCal() +
+      '<p>Lớp, học viên, sĩ số. Nút xem chuyên cần nằm trên từng thẻ.</p></button>') +
+      menuCard('schedule', '<button type="button" class="menu-card" data-act="nav" data-screen="schedule">' + iconCal() +
       '<div class="kicker">B · TIMETABLE</div><h2>Lịch các lớp</h2>' +
-      '<p>Một bảng sáng, chiều, tối. Lọc FET, CM, TA.</p></button>' +
-      '<button type="button" class="menu-card" data-act="nav" data-screen="homework">' + iconHw() +
+      '<p>Một bảng sáng, chiều, tối. Lọc FET, CM, PTL.</p></button>') +
+      menuCard('homework', '<button type="button" class="menu-card" data-act="nav" data-screen="homework">' + iconHw() +
       '<div class="kicker">C · HOMEWORK</div><h2>Theo dõi chuyên cần</h2>' +
-      '<p>Chuyên cần theo buổi trong tháng.</p></button>' +
-      '<button type="button" class="menu-card" data-act="nav" data-screen="feed">' + iconFeed() +
+      '<p>Chuyên cần theo buổi trong tháng.</p></button>') +
+      menuCard('feed', '<button type="button" class="menu-card" data-act="nav" data-screen="feed">' + iconFeed() +
       '<div class="kicker">D · BOARD</div><h2>Thông báo và đề xuất</h2>' +
-      '<p>Thông báo nhân sự và đề xuất.</p></button>' +
-      '<button type="button" class="menu-card" data-act="nav" data-screen="archive">' + iconArchive() +
+      '<p>Thông báo nhân sự và đề xuất.</p></button>') +
+      menuCard('archive', '<button type="button" class="menu-card" data-act="nav" data-screen="archive">' + iconArchive() +
       '<div class="kicker">E · STUDENT ARCHIVE</div><h2>Thư viện học viên</h2>' +
-      '<p>Official đang học. Học viên cũ/kết thúc đã dừng hoặc hết hạn.</p></button>' +
-      '<button type="button" class="menu-card" data-act="nav" data-screen="curriculum">' + iconBook() +
+      '<p>Official đang học. Học viên cũ/kết thúc đã dừng hoặc hết hạn.</p></button>') +
+      menuCard('curriculum', '<button type="button" class="menu-card" data-act="nav" data-screen="curriculum">' + iconBook() +
       (L.curriculumFresh(state.classes, new Date()) ? '<span class="comic-fresh">đăng kí mới</span>' : '') +
       '<div class="kicker">F · CURRICULUM</div><h2>Xác nhận giáo trình</h2>' +
-      '<p>Giáo trình, mua sách và tài khoản PEC.</p></button>' +
-      '<button type="button" class="menu-card" data-act="nav" data-screen="exam">' + iconExam() +
+      '<p>Giáo trình, mua sách và tài khoản PEC.</p></button>') +
+      menuCard('exam', '<button type="button" class="menu-card" data-act="nav" data-screen="exam">' + iconExam() +
       '<div class="kicker">G · EXAM</div><h2>Kỳ thi</h2>' +
-      '<p>Lọc lịch thi theo FET, cấp độ và chương trình.</p></button>' +
-      '<button type="button" class="menu-card" data-act="nav" data-screen="staff">' + iconStaff() +
+      '<p>Lọc lịch thi theo FET, cấp độ và chương trình.</p></button>') +
+      menuCard('staff', '<button type="button" class="menu-card" data-act="nav" data-screen="staff">' + iconStaff() +
       '<div class="kicker">H · TEACHER HOURS</div><h2>Công giáo viên</h2>' +
-      '<p>Giờ Teaching và giờ SOA của từng FET.</p></button>' +
-      '<button type="button" class="menu-card" data-act="nav" data-screen="dictionary">' + iconDict() +
+      '<p>Giờ Teaching và giờ SOA của từng FET.</p></button>') +
+      menuCard('dictionary', '<button type="button" class="menu-card" data-act="nav" data-screen="dictionary">' + iconDict() +
       '<span class="comic-meta">Bản meta thử nghiệm</span>' +
       '<div class="kicker">I · DICTIONARY</div><h2>Dictionary</h2>' +
-      '<p>Tra từ Anh–Việt, mức CEFR, dịch câu và tải phát âm.</p></button>' +
-      '<button type="button" class="menu-card" data-act="nav" data-screen="personnel">' + iconPeople() +
+      '<p>Tra từ Anh–Việt, mức CEFR, dịch câu và tải phát âm.</p></button>') +
+      menuCard('personnel', '<button type="button" class="menu-card" data-act="nav" data-screen="personnel">' + iconPeople() +
       '<div class="kicker">J · PERSONNEL</div><h2>Quản lý nhân sự</h2>' +
-      '<p>Tên, mã, chức vụ, ngày sinh và giới tính.</p></button>' +
-      '<button type="button" class="menu-card" data-act="nav" data-screen="care">' + iconCare() +
+      '<p>Tên, mã, chức vụ, ngày sinh và giới tính.</p></button>') +
+      menuCard('care', '<button type="button" class="menu-card" data-act="nav" data-screen="care">' + iconCare() +
       '<div class="kicker">K · STUDENT CARE</div><h2>Chăm sóc học viên</h2>' +
-      '<p>Tương tác theo tuần trong tháng và mức hiệu quả.</p></button>' +
-      '<button type="button" class="menu-card" data-act="nav" data-screen="remarks">' + iconRemark() +
+      '<p>Tương tác theo tuần trong tháng và mức hiệu quả.</p></button>') +
+      menuCard('remarks', '<button type="button" class="menu-card" data-act="nav" data-screen="remarks">' + iconRemark() +
       '<div class="kicker">L · REMARKS</div><h2>Nhận xét học viên</h2>' +
-      '<p>Thư mục lớp, sửa nhận xét trong cửa sổ nhỏ.</p></button>' +
+      '<p>Thư mục lớp, sửa nhận xét trong cửa sổ nhỏ.</p></button>') +
       '</section></details>');
   }
 
@@ -4170,6 +4236,7 @@
       });
     }
     (L.FET || []).forEach(addFet);
+    personnelNames(['FET']).forEach(addFet);
     var gradeMap = {};
     var programMap = {};
     (exam.entries || []).forEach(function (entry) {
@@ -4465,7 +4532,16 @@
   function bookStatusClass(id) {
     if (id === 'issued-paid') return 'book-issued-paid';
     if (id === 'issued-unpaid') return 'book-issued-unpaid';
+    if (id === 'closed-unissued') return 'book-closed-unissued';
+    if (id === 'already-have') return 'book-already-have';
     return 'book-not-bought';
+  }
+
+  function bookPriceTone(status) {
+    if (status === 'issued-unpaid') return ' is-unpaid';
+    if (status === 'already-have') return ' is-paid is-have';
+    if (status === 'issued-paid' || status === 'closed-unissued') return ' is-paid';
+    return '';
   }
 
   function bookStatusOptions(selected) {
@@ -4583,11 +4659,14 @@
   function curriculumStatsHtml() {
     var key = curriculumMonthKey();
     var stats = L.curriculumMonthStats(state.classes, key);
+    var pending = stats.pending || [];
     var body = '<table class="book-stats-table" id="book-sales"><thead><tr><th>Chỉ số</th><th>Số</th></tr></thead><tbody>' +
       '<tr><td>Số sách đã đóng phát trong tháng</td><td data-sale="paid-count">' + stats.soldBooks + '</td></tr>' +
       '<tr><td>Số sách còn nợ</td><td data-sale="debt-count">' + stats.debtBooks + '</td></tr>' +
       '<tr><td>Tổng doanh số đã đóng phát trong tháng</td><td data-sale="paid-money">' + esc(L.formatVnd(stats.revenue)) + '</td></tr>' +
       '<tr><td>Doanh số sách còn nợ chưa thanh toán</td><td data-sale="debt-money">' + esc(L.formatVnd(stats.debtRevenue)) + '</td></tr>' +
+      '<tr><td>Chưa phát giáo trình</td><td><span data-sale="pending-count">' + pending.length + '</span> <button type="button" class="btn" data-act="curriculum-pending">' +
+      (ui.curriculumPendingOpen ? 'Ẩn chi tiết' : 'Chi tiết') + '</button></td></tr>' +
       '</tbody></table>';
     var cm = '';
     if (ui.curriculumCmOpen) {
@@ -4597,13 +4676,20 @@
       cm = '<div class="table-wrap"><table class="book-stats-table" id="book-sales-cm"><thead><tr><th>CM</th><th>Sách đã đóng phát</th><th>Doanh số đã đóng</th><th>Sách còn nợ</th><th>Doanh số còn nợ</th></tr></thead><tbody>' +
         (cmRows || '<tr><td colspan="5">Chưa có CM.</td></tr>') + '</tbody></table></div>';
     }
+    var pendingRows = pending.map(function (row) {
+      return '<tr><td>' + esc(row.name || '—') + '</td><td>' + esc(row.className || '—') + '</td><td>' + esc(row.bookName || '—') + '</td></tr>';
+    }).join('');
+    var pendingTable = ui.curriculumPendingOpen
+      ? '<div class="table-wrap"><table class="book-stats-table" id="book-pending"><thead><tr><th>Học viên</th><th>Lớp</th><th>Giáo trình</th></tr></thead><tbody>' +
+        (pendingRows || '<tr><td colspan="3">Không có giáo trình chưa phát.</td></tr>') + '</tbody></table></div>'
+      : '';
     return '<section class="book-stats"><h3>Doanh số bán sách chung</h3>' +
       '<label class="field dash-month"><span>Tháng</span><input id="curriculum-month" type="month" value="' + esc(key) + '"></label>' +
-      '<p class="help">Số sách đã đóng phát và doanh số đã đóng chỉ tính sách chuyển sang Đã phát và đóng trong tháng đang xem. Sách chưa ghi ngày không cộng vào tháng đó. Số sách còn nợ và doanh số còn nợ là sách đang ở Đã phát-Chưa thanh toán, kể cả sách chưa ghi ngày.</p>' +
+      '<p class="help">Số sách đã đóng phát và doanh số đã đóng chỉ tính sách chuyển sang Đã phát và đóng trong tháng đang xem. Sách chưa ghi ngày không cộng vào tháng đó. Số sách còn nợ và doanh số còn nợ là sách đang ở Đã phát-Chưa thanh toán, kể cả sách chưa ghi ngày. Hàng Chưa phát giáo trình đếm sách đang ở Đã đóng, chưa phát, kể cả sách chưa ghi ngày, và không lọc theo tháng. Bấm Chi tiết để xem tên học viên, lớp và loại giáo trình chưa phát. Trạng thái Đã có hiển thị đã đóng và có gạch xác nhận, không cộng vào số sách và doanh số của tháng.</p>' +
       '<div class="book-stats-hit" data-act="curriculum-cm" role="button" tabindex="0">' + body + '</div>' +
       '<div class="btn-row"><button type="button" class="btn' + (ui.curriculumCmOpen ? ' btn-primary' : '') + '" data-act="curriculum-cm">' +
       (ui.curriculumCmOpen ? 'Ẩn chi tiết theo CM' : 'Xem chi tiết theo CM') + '</button></div>' +
-      cm + '</section>';
+      cm + pendingTable + '</section>';
   }
 
   function viewCurriculumList() {
@@ -4759,6 +4845,7 @@
     if (!book) return '<td class="book-slot book-slot-empty"></td>';
     var item = rec.books && rec.books[slot] ? rec.books[slot] : { status: 'not-bought' };
     var open = ui.bookFold === stu.id + ':' + slot;
+    var named = item.status === 'already-have' ? ' class="book-have-mark"' : '';
     var arrow = edit
       ? '<button type="button" class="book-arrow" data-act="book-fold" data-id="' + esc(stu.id) + '" data-slot="' + slot + '" aria-expanded="' + (open ? 'true' : 'false') + '" aria-label="Trạng thái thanh toán"><span class="chev"></span></button>'
       : '';
@@ -4767,15 +4854,14 @@
         return '<button type="button" class="btn book-choice ' + bookStatusClass(choice.id) + (choice.id === item.status ? ' is-on' : '') + '" data-act="book-set" data-id="' + esc(stu.id) + '" data-slot="' + slot + '" data-status="' + choice.id + '">' + esc(choice.label) + '</button>';
       }).join('') + '</div>'
       : '';
-    return '<td class="book-slot ' + bookStatusClass(item.status) + '"><div class="book-slot-head"><span>' + esc(book.name) + '</span>' + arrow + '</div>' + menu + '</td>';
+    return '<td class="book-slot ' + bookStatusClass(item.status) + '"><div class="book-slot-head"><span' + named + '>' + esc(book.name) + '</span>' + arrow + '</div>' + menu + '</td>';
   }
 
   function bookPriceHtml(catalog, rec) {
     if (!catalog.length) return '<span class="book-price">—</span>';
     return catalog.map(function (book, index) {
       var item = rec.books && rec.books[index] ? rec.books[index] : { status: 'not-bought' };
-      var tone = item.status === 'issued-paid' ? ' is-paid' : (item.status === 'issued-unpaid' ? ' is-unpaid' : '');
-      return '<span class="book-price' + tone + '">' + esc(L.formatVnd(book.price)) + '</span>';
+      return '<span class="book-price' + bookPriceTone(item.status) + '">' + esc(L.formatVnd(book.price)) + '</span>';
     }).join('');
   }
 
@@ -4789,7 +4875,7 @@
     if (!edit) {
       return catalog.map(function (book, index) {
         var item = bookRec.books && bookRec.books[index] ? bookRec.books[index] : { status: 'not-bought' };
-        var tone = item.status === 'issued-paid' ? ' is-paid' : (item.status === 'issued-unpaid' ? ' is-unpaid' : '');
+        var tone = bookPriceTone(item.status);
         return '<br><b>' + esc(book.name) + ':</b> ' + bookStatusView(item.status) +
           ' <span class="book-price' + tone + '">' + esc(L.formatVnd(book.price)) + '</span>';
       }).join('');
@@ -5017,8 +5103,11 @@
       held + extra +
       '<span class="meter" aria-hidden="true"><span style="width:' + pct + '%"></span></span></button>';
     if (mode === 'homework') return button;
-    var side = (mode === 'curriculum' || mode === 'care' || mode === 'remarks') ? '' : '<button type="button" class="btn folder-hw" data-act="open-homework" data-id="' + esc(cls.id) + '">Xem chuyên cần</button>';
-    return '<div class="folder-item" data-name="' + esc(String(name).toLowerCase()) + '">' + button + side + '</div>';
+    var side = (mode === 'curriculum' || mode === 'care' || mode === 'remarks' || isBsa()) ? '' : '<button type="button" class="btn folder-hw" data-act="open-homework" data-id="' + esc(cls.id) + '">Xem chuyên cần</button>';
+    var pick = (!mode && ui.classMulti && canEdit())
+      ? '<label class="class-pick"><input type="checkbox" data-class-pick="' + esc(cls.id) + '"' + (ui.classPick[cls.id] ? ' checked' : '') + '> Chọn</label>'
+      : '';
+    return '<div class="folder-item" data-name="' + esc(String(name).toLowerCase()) + '">' + pick + button + side + '</div>';
   }
 
   function classLine(cls, mode) {
@@ -5027,8 +5116,12 @@
     var group = classGroupId(cls, level);
     var name = L.currentName(cls);
     var act = mode === 'curriculum' ? 'open-curriculum' : (mode === 'care' ? 'open-care' : (mode === 'remarks' ? 'open-remarks' : 'open-class'));
-    var side = (mode === 'curriculum' || mode === 'care' || mode === 'remarks') ? '' : '<button type="button" class="btn" data-act="open-homework" data-id="' + esc(cls.id) + '">Xem chuyên cần</button>';
+    var side = (mode === 'curriculum' || mode === 'care' || mode === 'remarks' || isBsa()) ? '' : '<button type="button" class="btn" data-act="open-homework" data-id="' + esc(cls.id) + '">Xem chuyên cần</button>';
+    var pick = (!mode && ui.classMulti && canEdit())
+      ? '<label class="class-pick"><input type="checkbox" data-class-pick="' + esc(cls.id) + '"' + (ui.classPick[cls.id] ? ' checked' : '') + '> Chọn</label>'
+      : '';
     return '<div class="class-line group-' + esc(String(group || '').toLowerCase()) + '" data-name="' + esc(name.toLowerCase()) + '">' +
+      pick +
       '<button type="button" class="class-open" data-act="' + act + '" data-id="' + esc(cls.id) + '">' +
       '<strong>' + esc(name) + classUpdatedMark(cls) + '</strong>' +
       '<span>Trình độ: ' + esc(L.trackLabel(cls, grade)) + '</span>' +
@@ -5113,10 +5206,12 @@
         '<button type="button" class="btn" data-act="export-classes" data-kind="img">Ảnh</button>' +
         '<button type="button" class="btn" data-act="export-classes" data-kind="jpg">JPG</button>' +
         '<button type="button" class="btn" data-act="export-classes" data-kind="print">Print (in)</button>' : '') +
-      (canEdit() ? '<button type="button" class="btn btn-primary" data-act="open-add-class">+ Thêm lớp</button>' : '') +
+      (canEdit() ? '<button type="button" class="btn' + (ui.classMulti ? ' btn-primary' : '') + '" data-act="class-multi">Chọn nhiều</button>' +
+        '<button type="button" class="btn btn-primary" data-act="open-add-class">+ Thêm lớp</button>' : '') +
       '</div></div>' +
       summaryHtml(currentWeekStats(null)) +
-      '<p class="help">Thư mục viền vàng là KINDY, viền xanh là KIDS, viền đỏ là TEENS, viền xanh lá là IELTS, viền tím là lớp custom. Dạng thẻ là mặc định. Dạng list xếp theo trình độ hoặc số lớp và giữ màu khung theo loại lớp. Mọi lớp trong file đều hiện ở đây. Lớp không thuộc năm nhóm trên nằm ở cuối. Lớp custom không lên trình độ. Lớp TEENS hết TEENS 2B lên thang IELTS: tên trình độ vẫn là TEENS, cấp độ theo IELTS, số lớp giữ nguyên, thư mục nằm ở nhóm IELTS. Thẻ có dấu ! là lớp quá tải, sĩ số trên 17. Sĩ số có số thứ tự tối đa 20. Nhãn (Updated) ở góc thẻ là lớp vừa có cập nhật, tự mất sau 2 ngày. Bấm vào thư mục để mở lớp. Nút Xem chuyên cần mở bảng chuyên cần của lớp. Print (in) mở hộp thoại in của máy và in bảng danh sách lớp đang xem.</p>' +
+      '<p class="help">Thư mục viền vàng là KINDY, viền xanh là KIDS, viền đỏ là TEENS, viền xanh lá là IELTS, viền tím là lớp custom. Dạng thẻ là mặc định. Dạng list xếp theo trình độ hoặc số lớp và giữ màu khung theo loại lớp. Mọi lớp trong file đều hiện ở đây. Lớp không thuộc năm nhóm trên nằm ở cuối. Lớp custom không lên trình độ. Lớp TEENS hết TEENS 2B lên thang IELTS: tên trình độ vẫn là TEENS, cấp độ theo IELTS, số lớp giữ nguyên, thư mục nằm ở nhóm IELTS. Thẻ có dấu ! là lớp quá tải, sĩ số trên 17. Sĩ số có số thứ tự tối đa 20. Nhãn (Updated) ở góc thẻ là lớp vừa có cập nhật, tự mất sau 2 ngày. Bấm vào thư mục để mở lớp. Nút Xem chuyên cần mở bảng chuyên cần của lớp. Print (in) mở hộp thoại in của máy và in bảng danh sách lớp đang xem. Chọn nhiều rồi tích các lớp để đổi chung FET, CM hoặc PTL. Ô để trống giữ nguyên giá trị đang có trên từng lớp.</p>' +
+      classBulkBar() +
       classBrowser('classes') + modalHtml());
   }
 
@@ -5197,14 +5292,14 @@
       '<div class="stat"><b>Lesson</b>' + progress.done + '/' + progress.total + ' · ' + (cls.schedule || []).length + ' buổi/tuần</div>' +
       '<div class="stat"><b>FET</b>' + esc(L.staffText(L.classFetNames(cls).join(', '))) + '</div>' +
       '<div class="stat"><b>CM phụ trách</b>' + esc(L.staffText(cls.cm)) + '</div>' +
-      '<div class="stat"><b>TA phụ trách</b>' + esc(L.staffText(cls.ta)) + '</div>' +
+      '<div class="stat"><b>PTL (phụ trách lớp)</b>' + esc(L.staffText(cls.ta)) + '</div>' +
       '<div class="stat"><b>Mã lớp</b>' + esc(cls.classCode || '—') + '</div></div>' +
       '<div class="slot-list">' + (slotHtml || '<span class="muted">Chưa có lịch học.</span>') + '</div>' +
       '<div class="meter" aria-hidden="true"><span style="width:' + (progress.total ? Math.round(progress.done / progress.total * 100) : 0) + '%"></span></div>' +
       '<div class="toolbar"><span class="help">Sắp xếp STT</span>' +
       '<button type="button" class="btn' + (ui.sort === 'name' ? ' btn-primary' : '') + '" data-act="sort" data-sort="name">Theo tên</button>' +
       '<button type="button" class="btn' + (ui.sort === 'dob' ? ' btn-primary' : '') + '" data-act="sort" data-sort="dob">Theo ngày sinh</button></div>' +
-      '<p class="help">Chính thức có số thứ tự. Học bổng đánh dấu vàng Học viên 1 tháng và có số thứ tự đến khi hết số buổi. Trial đúng một buổi: nếu ngày đó đã qua và chưa chuyển lớp, dòng nằm cuối bảng màu xám, không có số thứ tự. Học viên outdated cũng là dòng xám và hiện thời gian xóa tự động. Nút Dừng cần một dòng giải trình. Học viên đó rời danh sách có số thứ tự, hiện riêng phía dưới, không có số thứ tự, và đếm ngược 7 ngày trước khi vào Học viên cũ/kết thúc. Sĩ số có số thứ tự tối đa 20.</p>' +
+      '<p class="help">Chính thức có số thứ tự. Học bổng đánh dấu vàng Học viên 1 tháng và có số thứ tự đến khi hết số buổi. Trial đúng một buổi: nếu ngày đó đã qua và chưa chuyển lớp, dòng nằm cuối bảng màu xám, không có số thứ tự. Học viên outdated cũng là dòng xám và hiện thời gian xóa tự động. Nút Dừng cần một dòng giải trình. Học viên dừng học bị khóa thẻ và data trên lớp, rồi biến mất khỏi Mục A ngay khi danh sách lớp cập nhật và vào Học viên cũ/kết thúc. Trial, học bổng và outdated vẫn đếm ngược 7 ngày. Sĩ số có số thứ tự tối đa 20.</p>' +
       (canExportClasses() ? '<p class="help">Print (in) in các hàng học viên đã tick. Không tick thì in cả bảng đang xem, kể cả dòng xám không số thứ tự.</p>' : '') +
       (studentOps || edit ? '<div class="bulk-bar" id="bulk-bar"' + (n ? '' : ' hidden') + '><strong>Đã chọn <span id="bulk-count">' + n + '</span></strong>' +
       '<div class="btn-row">' + (studentOps ? '<button type="button" class="btn" data-act="bulk-transfer">Chuyển lớp</button>' : '') +
@@ -5429,7 +5524,7 @@
       '<div class="btn-row">' + soaBtn + '<button type="button" class="btn" data-act="week" data-dir="-1">‹ Tuần trước</button>' +
       '<strong>' + (ui.weekOffset === 0 ? 'Tuần này · ' : '') + esc(model.label) + '</strong>' +
       '<button type="button" class="btn" data-act="week" data-dir="1"' + (ui.weekOffset === 0 ? ' disabled' : '') + '>Tuần sau ›</button></div></div>' +
-      '<div class="filter-bar">' + staffFilterSelect('FET', 'fet', L.FET) + staffFilterSelect('CM', 'cm', L.STAFF) + staffFilterSelect('TA', 'ta', L.STAFF) +
+      '<div class="filter-bar">' + staffFilterSelect('FET', 'fet', fetChoices()) + staffFilterSelect('CM', 'cm', cmChoices()) + staffFilterSelect('PTL', 'ta', ptlChoices()) +
       '<button type="button" class="btn" data-act="clear-filter">Bỏ lọc</button></div>' +
       summaryHtml(model.stats, ui.staffFilter.fet) + exportBtns +
       '<div class="schedule">' + timetableHtml(model.stats.grid, model.now) + '</div>' + modalHtml());
@@ -5542,7 +5637,7 @@
   }
 
   function hwLegend() {
-    return '<div class="hw-legend"><p><b>DONE</b> xanh lá: đã hoàn thành bài tập, tính 100%. <b>NONE</b> đỏ: chưa làm bài, tính 0%. <b>MISS</b> cam: thiếu bài, tính 50%. <b>ABSENT</b> nền trắng chữ đen: vắng mặt, không bù, tính 0%. <b>APPLIED</b> cyan: vắng mặt đã bù, tính 100% buổi đó. <b>MOVED</b> xanh/vàng: chuyển lớp, không tính vào tỉ lệ.</p>' +
+    return '<div class="hw-legend"><p><b>DONE</b> xanh lá: đã hoàn thành bài tập, tính 100%. <b>NONE</b> đỏ: chưa làm bài, tính 0%. <b>MISS</b> cam: thiếu bài, tính 50%. <b>ABSENT</b> nền trắng chữ đen: vắng mặt, không bù, tính 0%. <b>APPLIED</b> cyan: vắng mặt đã bù, tính 100% buổi đó. <b>TEST</b> cam đậm: bài kiểm tra, tính 100%. <b>MOVED</b> xanh/vàng: chuyển lớp, không tính vào tỉ lệ. Thẻ mục L ghi DONE, MISS, ABSENT hoặc TEST vào buổi đó. Issue và Unfinished đỏ không ghi chuyên cần.</p>' +
       '<p>Tỉ lệ tháng bằng tổng điểm các buổi học viên đang ở lớp, chia đều cho số buổi đó. Ô chưa đánh dấu tính 0%. Buổi sau khi chuyển đi không tính. Buổi đã qua, kể cả trước ngày vào lớp, Admin và Commenter vẫn bấm để đánh dấu.</p>' +
       '<p>Hàng xanh là chuyên cần trên 80%. Hàng đỏ là dưới 50% trong tháng. Khung vàng là học viên từ 40% đến 80%. Khung đỏ là học viên dưới 40%. Học viên đã dừng nằm cuối bảng, ô chuyên cần khóa và dòng ghi Unavailable.</p></div>';
   }
@@ -5600,8 +5695,41 @@
       hwLegend() + detailHtml() + modalHtml());
   }
 
-  function staffOptions(list, selected) {
-    var html = '<option value="">— Không chọn —</option>';
+  function personnelNames(positions) {
+    var want = {};
+    (positions || []).forEach(function (id) { want[String(id || '').toUpperCase()] = true; });
+    var names = [];
+    var seen = {};
+    (state.personnel || []).forEach(function (row) {
+      if (!want[String(row && row.position || '').toUpperCase()]) return;
+      var text = String(row.name || '').replace(/\s+/g, ' ').trim();
+      var key = text.toLowerCase();
+      if (!text || text === '?' || text === '-' || seen[key]) return;
+      seen[key] = true;
+      names.push(text);
+    });
+    return names;
+  }
+
+  function mergeNames(base, extra) {
+    var names = (base || []).slice();
+    var seen = {};
+    names.forEach(function (name) { seen[String(name || '').toLowerCase()] = true; });
+    (extra || []).forEach(function (name) {
+      var text = String(name || '').replace(/\s+/g, ' ').trim();
+      if (!text || seen[text.toLowerCase()]) return;
+      seen[text.toLowerCase()] = true;
+      names.push(text);
+    });
+    return names;
+  }
+
+  function fetChoices() { return mergeNames(L.FET, personnelNames(['FET'])); }
+  function cmChoices() { return mergeNames(L.STAFF, personnelNames(['CM'])); }
+  function ptlChoices() { return mergeNames(L.STAFF, personnelNames(['CM', 'TA'])); }
+
+  function staffOptions(list, selected, blankLabel) {
+    var html = '<option value="">' + esc(blankLabel || '— Không chọn —') + '</option>';
     var seen = false;
     list.forEach(function (name) {
       if (name === selected) seen = true;
@@ -5609,6 +5737,43 @@
     });
     if (selected && !seen) html += '<option value="' + esc(selected) + '" selected>' + esc(selected) + '</option>';
     return html;
+  }
+
+  function classBulkBar() {
+    if (!canEdit() || !ui.classMulti) return '';
+    var n = Object.keys(ui.classPick || {}).length;
+    return '<div class="bulk-bar" id="class-bulk"><strong>Đã chọn <span id="class-bulk-count">' + n + '</span> lớp</strong>' +
+      '<div class="class-bulk-fields">' +
+      '<label class="field"><span>FET giảng dạy</span><select id="bulk-fet">' + staffOptions(fetChoices(), '', '— Giữ nguyên —') + '</select></label>' +
+      '<label class="field"><span>CM</span><select id="bulk-cm">' + staffOptions(cmChoices(), '', '— Giữ nguyên —') + '</select></label>' +
+      '<label class="field"><span>PTL (phụ trách lớp)</span><select id="bulk-ta">' + staffOptions(ptlChoices(), '', '— Giữ nguyên —') + '</select></label></div>' +
+      '<p class="help">Ô để trống giữ nguyên CM, PTL hoặc FET đang có trên từng lớp, kể cả khi các lớp đang khác nhau. CM có thể vừa là CM vừa là PTL.</p>' +
+      '<div class="btn-row"><button type="button" class="btn btn-primary" data-act="class-bulk-apply">Áp dụng</button>' +
+      '<button type="button" class="btn" data-act="class-bulk-clear">Bỏ chọn</button></div></div>';
+  }
+
+  function applyClassBulk() {
+    if (deny(canEdit())) return;
+    var fetEl = document.getElementById('bulk-fet');
+    var cmEl = document.getElementById('bulk-cm');
+    var taEl = document.getElementById('bulk-ta');
+    var fet = fetEl ? String(fetEl.value || '') : '';
+    var cm = cmEl ? String(cmEl.value || '') : '';
+    var ta = taEl ? String(taEl.value || '') : '';
+    var ids = Object.keys(ui.classPick || {});
+    if (!ids.length) { toast('Hãy tích các lớp cần đổi.'); return; }
+    if (!fet && !cm && !ta) { toast('Các ô trống được giữ nguyên. Hãy chọn CM, PTL hoặc FET cần ghi chung.'); return; }
+    var n = 0;
+    (state.classes || []).forEach(function (cls) {
+      if (!ui.classPick[cls.id]) return;
+      if (fet) cls.fet = fet;
+      if (cm) cls.cm = cm;
+      if (ta) cls.ta = ta;
+      n += 1;
+    });
+    save();
+    toast('Đã cập nhật ' + n + ' lớp.');
+    render();
   }
 
   function dayEditor(schedule) {
@@ -5701,10 +5866,10 @@
       '<p class="field-label">Lịch học trong tuần (tối đa 7 buổi)</p>' + dayEditor(schedule) +
       fixedSchedule +
       closeEnd +
-      '<label class="field"><span>FET</span><select name="fet">' + staffOptions(L.FET, fet) + '</select></label>' +
-      '<label class="field"><span>CM phụ trách</span><select name="cm">' + staffOptions(L.STAFF, cm) + '</select></label>' +
-      '<label class="field"><span>TA phụ trách</span><select name="ta">' + staffOptions(L.STAFF, ta) + '</select></label>' +
-      '<p class="help">Bỏ trống FET, CM hoặc TA thì hồ sơ hiện dấu ?</p></form>';
+      '<label class="field"><span>FET</span><select name="fet">' + staffOptions(fetChoices(), fet) + '</select></label>' +
+      '<label class="field"><span>CM phụ trách</span><select name="cm">' + staffOptions(cmChoices(), cm) + '</select></label>' +
+      '<label class="field"><span>PTL (phụ trách lớp)</span><select name="ta">' + staffOptions(ptlChoices(), ta) + '</select></label>' +
+      '<p class="help">Bỏ trống FET, CM hoặc PTL thì hồ sơ hiện dấu ?. Nhân sự FET, CM và TA có trong các danh sách này. CM vừa chọn được làm CM, vừa chọn được làm PTL.</p></form>';
     var footer = '<button type="submit" form="class-form" class="btn btn-primary">' + (editing ? 'Lưu lớp' : 'Tạo lớp') + '</button>' +
       (editing ? '<button type="button" class="btn btn-danger" data-act="delete-class">Xóa lớp</button>' : '') +
       '<button type="button" class="btn" data-act="close-modal">Hủy</button>';
@@ -6102,7 +6267,7 @@
       var override = cls.sessionFets && cls.sessionFets[key] ? cls.sessionFets[key] : '';
       var names = {};
       L.classFetNames(cls).forEach(function (name) { names[name] = true; });
-      L.FET.forEach(function (name) { names[name] = true; });
+      fetChoices().forEach(function (name) { names[name] = true; });
       var options = '<option value="">FET lớp</option>' + Object.keys(names).map(function (name) {
         return '<option value="' + esc(name) + '"' + (override === name ? ' selected' : '') + '>' + esc(name) + '</option>';
       }).join('');
@@ -6309,7 +6474,7 @@
         (former ? '<td>' + esc(showText(row.reason)) + '</td>' : '') + '</tr>';
     }).join('') : '<tr><td colspan="' + cols + '">Không có học viên khớp bộ lọc.</td></tr>';
     var purge = pick ? '<div class="btn-row"><button type="button" class="btn btn-danger" data-act="archive-purge">Xóa vĩnh viễn</button></div>' +
-      '<p class="help">Danh sách này dành cho học viên đã dừng học, sau 7 ngày, và các em hết hạn Trial, học bổng hoặc outdated. Admin chọn học viên ở đây để xóa vĩnh viễn khỏi data.</p>' : '';
+      '<p class="help">Học viên dừng học vào đây ngay khi Mục A cập nhật. Data của các em được giữ trong thư viện và không còn thẻ trên lớp. Trial, học bổng hoặc outdated vẫn sau 7 ngày. Admin chọn học viên ở đây để xóa vĩnh viễn khỏi data.</p>' : '';
     return shell('<div class="section-head"><div><span class="nav-pair"><button type="button" class="btn" data-act="archive-back">← Thư viện</button>' + homeButton() + '</span>' +
       '<h2>' + esc(title) + '</h2></div></div>' +
       '<div class="filter-bar">' +
@@ -6330,7 +6495,7 @@
 
   function expireForm() {
     return modalShell('Dừng',
-      '<p>Dừng ' + selectedIds().length + ' học viên đã chọn. Các em rời danh sách có số thứ tự và hiện riêng phía dưới, không có số thứ tự. Dòng giải trình đi cùng đếm ngược 7 ngày, rồi chuyển vào Học viên cũ/kết thúc.</p>' +
+      '<p>Dừng ' + selectedIds().length + ' học viên đã chọn. Thẻ và data trên lớp bị khóa. Các em biến mất khỏi Mục A ngay khi danh sách cập nhật và vào Học viên cũ/kết thúc. Data được giữ trong thư viện.</p>' +
       '<label class="field"><span>Giải trình</span><textarea id="expire-reason" maxlength="500"></textarea></label>' +
       '<p class="help">Viết dòng giải trình trước khi xác nhận.</p>',
       '<button type="button" class="btn btn-primary" data-act="do-expire">Xác nhận</button>' +
@@ -6341,7 +6506,7 @@
     return modalShell('Thêm giờ SOA',
       '<form id="soa-form">' +
       '<label class="field"><span>FET</span><select name="fet" required><option value="">Chọn giáo viên</option>' +
-      L.FET.map(function (name) { return '<option value="' + esc(name) + '">' + esc(name) + '</option>'; }).join('') +
+      fetChoices().map(function (name) { return '<option value="' + esc(name) + '">' + esc(name) + '</option>'; }).join('') +
       '</select></label>' +
       '<label class="field"><span>Loại giờ</span><select name="soaType" required><option value="">Chọn loại giờ</option>' +
       SOA_TYPES.map(function (type) { return '<option value="' + esc(type) + '">' + esc(type) + '</option>'; }).join('') +
@@ -6518,7 +6683,10 @@
   function positionText(id) {
     var key = String(id || '').toUpperCase();
     for (var i = 0; i < POSITIONS.length; i++) {
-      if (POSITIONS[i].id === key) return POSITIONS[i].id + ' · ' + POSITIONS[i].name;
+      if (POSITIONS[i].id === key) {
+        if (POSITIONS[i].name === POSITIONS[i].id) return POSITIONS[i].id;
+        return POSITIONS[i].id + ' · ' + POSITIONS[i].name;
+      }
     }
     return '—';
   }
@@ -6587,47 +6755,104 @@
 
   function peopleForm() {
     var row = ui.modal && ui.modal.key ? personByKey(ui.modal.key) : null;
-    var position = row ? row.position : '';
+    var draft = ui.modal && ui.modal.draft ? ui.modal.draft : null;
+    var position = draft && draft.position != null ? draft.position : (row ? row.position : '');
     var options = '<option value="">Chưa chọn</option>' + POSITIONS.map(function (item) {
-      var label = item.id + ' · ' + item.name;
+      var label = item.name === item.id ? item.id : (item.id + ' · ' + item.name);
       return '<option value="' + item.id + '"' + (position === item.id ? ' selected' : '') + '>' + esc(label) + '</option>';
     }).join('');
-    var gender = row ? row.gender : '';
+    var gender = draft && draft.gender != null ? draft.gender : (row ? row.gender : '');
+    var name = draft && draft.name != null ? draft.name : (row ? row.name : '');
+    var code = draft && draft.code != null ? draft.code : (row ? row.code : '');
+    var dob = draft && draft.dob != null ? draft.dob : (row && row.dob ? row.dob : '');
     var genders = [{ value: '', label: '—' }, { value: 'Nam', label: 'Nam' }, { value: 'Nữ', label: 'Nữ' }, { value: 'Khác', label: 'Khác' }];
     var gopts = genders.map(function (item) {
       return '<option value="' + esc(item.value) + '"' + (gender === item.value ? ' selected' : '') + '>' + esc(item.label) + '</option>';
     }).join('');
     return modalShell(row ? 'Sửa nhân sự' : 'Thêm nhân sự',
-      '<label class="field"><span>Tên nhân sự</span><input id="people-name" value="' + esc(row ? row.name : '') + '" autocomplete="off"></label>' +
-      '<label class="field"><span>Mã nhân sự</span><input id="people-code" value="' + esc(row ? row.code : '') + '" autocomplete="off"></label>' +
+      '<label class="field"><span>Tên nhân sự</span><input id="people-name" value="' + esc(name) + '" autocomplete="off"></label>' +
+      '<label class="field"><span>Mã nhân sự</span><input id="people-code" value="' + esc(code) + '" autocomplete="off"></label>' +
       '<label class="field"><span>Chức vụ</span><select id="people-position">' + options + '</select></label>' +
-      '<label class="field"><span>Ngày sinh</span><input id="people-dob" type="date" value="' + esc(row && row.dob ? row.dob : '') + '"></label>' +
+      '<label class="field"><span>Ngày sinh</span><input id="people-dob" type="date" value="' + esc(dob) + '"></label>' +
       '<label class="field"><span>Giới tính</span><select id="people-gender">' + gopts + '</select></label>' +
-      '<p class="help">Admin chọn chức vụ. Ngày sinh hiện trên danh sách theo dd/mm/yyyy.</p>',
+      '<label class="field" id="people-pass-wrap"' + (position === 'BSA' ? '' : ' hidden') + '><span>Mật khẩu đăng nhập BSA</span><input id="people-pass" type="password" autocomplete="off" readonly spellcheck="false"></label>' +
+      '<p class="help">Admin chọn chức vụ. Ngày sinh hiện trên danh sách theo dd/mm/yyyy. FET, CM và TA xuất hiện ở danh sách chọn tương ứng. CM vừa làm CM vừa làm PTL. BSA chỉ xem mục A, F, J, K, L và cần mật khẩu. Mã nhân sự của BSA là username.</p>',
       '<button type="button" class="btn btn-primary" data-act="people-save">Lưu</button><button type="button" class="btn" data-act="close-modal">Hủy</button>');
   }
 
-  function savePerson() {
-    if (deny(canEdit()) || !ui.modal || ui.modal.type !== 'people-form') return;
+  function peopleDraftFromFields() {
     var nameEl = document.getElementById('people-name');
     var codeEl = document.getElementById('people-code');
     var posEl = document.getElementById('people-position');
     var dobEl = document.getElementById('people-dob');
     var genderEl = document.getElementById('people-gender');
+    return {
+      name: String(nameEl && nameEl.value || ''),
+      code: String(codeEl && codeEl.value || ''),
+      position: String(posEl && posEl.value || '').toUpperCase(),
+      dob: String(dobEl && dobEl.value || ''),
+      gender: String(genderEl && genderEl.value || '')
+    };
+  }
+
+  function ensureBsaLogin(name, code, passEl) {
+    var username = String(code || '').trim();
+    if (!username) return 'BSA cần mã nhân sự. Mã đó là username đăng nhập.';
+    var typed = !!(passEl && passEl.getAttribute('data-typed') === '1');
+    var password = typed && passEl ? String(passEl.value || '') : '';
+    var existing = null;
+    (state.accounts || []).forEach(function (acc) {
+      if (String(acc.username || '').trim() === username) existing = acc;
+    });
+    if (existing && existing.role !== 'bsa') return 'Mã nhân sự này đang là username của tài khoản khác.';
+    if (!existing && !password) return 'Tài khoản BSA cần mật khẩu.';
+    if (existing && typed && !password) return 'Tài khoản BSA cần mật khẩu.';
+    if (existing) {
+      existing.name = name;
+      existing.role = 'bsa';
+      if (typed) existing.password = password;
+      if (!String(existing.password || '')) return 'Tài khoản BSA cần mật khẩu.';
+    } else {
+      state.accounts.push({ id: L.uid(), name: name, username: username, role: 'bsa', password: password });
+    }
+    return '';
+  }
+
+  function savePerson() {
+    if (deny(canEdit()) || !ui.modal || ui.modal.type !== 'people-form') return;
+    var draft = peopleDraftFromFields();
+    ui.modal.draft = draft;
+    var nameEl = document.getElementById('people-name');
+    var codeEl = document.getElementById('people-code');
+    var genderEl = document.getElementById('people-gender');
+    var dobEl = document.getElementById('people-dob');
     var name = String(nameEl && nameEl.value || '').replace(/\s+/g, ' ').trim();
     if (!name || name === '?' || name === '-') {
       ui.formError = 'Cần tên nhân sự.';
       render();
       return;
     }
-    var position = String(posEl && posEl.value || '').toUpperCase();
+    var position = draft.position;
     var known = false;
     POSITIONS.forEach(function (item) { if (item.id === position) known = true; });
-    if (position && !known) return;
+    if (position && !known) {
+      ui.formError = 'Chức vụ chưa có trong danh sách.';
+      render();
+      return;
+    }
     var gender = String(genderEl && genderEl.value || '');
     if (gender !== 'Nam' && gender !== 'Nữ' && gender !== 'Khác') gender = '';
     var dob = String(dobEl && dobEl.value || '');
     if (dob && !/^\d{4}-\d{2}-\d{2}$/.test(dob)) dob = '';
+    if (position === 'BSA') {
+      var passEl = document.getElementById('people-pass');
+      var passError = ensureBsaLogin(name, codeEl && codeEl.value, passEl);
+      if (passError) {
+        ui.formError = passError;
+        render();
+        return;
+      }
+    }
     var key = personKey(name);
     var prevKey = ui.modal.key || '';
     var keptId = '';
@@ -6710,7 +6935,7 @@
       '<button type="button" class="btn' + (layout !== 'list' ? ' btn-primary' : '') + '" data-act="people-layout" data-layout="table">Dạng bảng</button>' +
       '<button type="button" class="btn' + (layout === 'list' ? ' btn-primary' : '') + '" data-act="people-layout" data-layout="list">Dạng danh sách</button></div>' +
       '<label class="field class-q"><span>Tìm nhân sự</span><input id="people-q" placeholder="Tên, mã hoặc chức vụ" autocomplete="off" value="' + esc(ui.peopleQuery || '') + '"></label>' +
-      '<p class="help">Danh sách gồm tài khoản nhân sự và người đang là CM, FET hoặc TA trên lớp. Bấm Chi tiết để xem tên, mã, chức vụ, ngày sinh và giới tính. Admin sửa các mục này. CM là Class Manager, EC là Educational Consultant, FET là Foreign English Teacher, BM là Branch Manager, BAM là Branch Administrative Manager, FBM là Floating Branch Manager, TTL là Training Team Leader, ATL là Administrative Team Leader.</p>' +
+      '<p class="help">Danh sách gồm tài khoản nhân sự và người đang là CM, FET hoặc TA trên lớp. Bấm Chi tiết để xem tên, mã, chức vụ, ngày sinh và giới tính. Admin sửa các mục này. CM là Class Manager, EC là Educational Consultant, FET là Foreign English Teacher, TA là Teaching Assistant, BSA chỉ xem mục A, F, J, K, L, BM là Branch Manager, BAM là Branch Administrative Manager, FBM là Floating Branch Manager, TTL là Training Team Leader, ATL là Administrative Team Leader. Tạo nhân sự FET, CM hoặc TA thì tên đó vào danh sách chọn tương ứng. CM cũng vào danh sách PTL.</p>' +
       (rows.length ? (layout === 'list' ? list : table) : '<p class="muted">Chưa có nhân sự.</p>') +
       (canEdit() ? '' : '<p class="help">Tài khoản này chỉ xem nhân sự.</p>') +
       modalHtml());
@@ -7412,6 +7637,7 @@
     var nextKey = '';
     var shot = null;
     try {
+      if (ui.user && ui.screen !== 'login' && !screenAllowed(ui.screen)) ui.screen = 'menu';
       if (ui.user && ui.screen !== 'login') sweepRoster();
       if (!ui.user || ui.screen === 'login') html = viewLogin();
       else if (heldClasses().length) html = viewCodeGate();
@@ -8218,7 +8444,8 @@
       none: ['NONE', '#d90429', '#ffffff'],
       miss: ['MISS', '#ef8a1a', '#1a1a1a'],
       absent: ['ABSENT', '#ffffff', '#111111'],
-      applied: ['APPLIED', '#67e8f9', '#042033']
+      applied: ['APPLIED', '#67e8f9', '#042033'],
+      test: ['TEST', '#f97316', '#111111']
     };
     var item = map[cell.status];
     if (!item) return { text: '', fill: '#ffffff', ink: '#12324a' };
@@ -9172,7 +9399,8 @@
         '<label class="field"><span>Bậc tài khoản</span><select id="acc-role">' +
         '<option value="admin"' + (role === 'admin' ? ' selected' : '') + '>Admin (đỏ)</option>' +
         '<option value="commenter"' + (role === 'commenter' ? ' selected' : '') + '>Commenter (vàng)</option>' +
-        '<option value="guest"' + (role === 'guest' ? ' selected' : '') + '>Guest (xanh biển)</option></select></label>' +
+        '<option value="guest"' + (role === 'guest' ? ' selected' : '') + '>Guest (xanh biển)</option>' +
+        '<option value="bsa"' + (role === 'bsa' ? ' selected' : '') + '>BSA (chỉ xem A, F, J, K, L)</option></select></label>' +
         '<div id="acc-perm-wrap" class="perm-box"' + (role === 'admin' ? ' hidden' : '') + '>' +
         '<p class="field-label">Quyền bật / tắt</p>' +
         '<label class="checkline"><input type="checkbox" id="perm-classes"' + (perms.exportClasses ? ' checked' : '') + '> Quyền xuất file trên danh sách lớp</label>' +
@@ -9181,7 +9409,7 @@
         '<label class="field" id="acc-pass-wrap"' + (role === 'guest' ? ' hidden' : '') + '><span>Mật khẩu' + (editing ? ' — gõ mật khẩu mới, để trống nếu giữ mật khẩu đang dùng' : ' — gõ mật khẩu dùng để đăng nhập') + '</span><input id="acc-pass" type="password" autocomplete="off" readonly spellcheck="false"></label>' +
         '<div class="btn-row"><button type="submit" class="btn btn-primary">Lưu tài khoản</button><button type="button" class="btn" data-act="cancel-account">Hủy</button></div></form>';
     }
-    panel.innerHTML = '<h3>Quản lý tài khoản</h3><p class="help">Admin sửa tài khoản của mình, thêm, xóa và phân bậc tài khoản khác. Với Commenter và Guest, bật hoặc tắt từng quyền. Các việc không được bật (sửa lớp, học viên, tài khoản, đăng thông báo, đổi buổi) chỉ Admin làm được. Commenter vẫn đánh dấu chuyên cần. Chọn Guest thì không nhập mật khẩu.</p>' +
+    panel.innerHTML = '<h3>Quản lý tài khoản</h3><p class="help">Admin sửa tài khoản của mình, thêm, xóa và phân bậc tài khoản khác. Với Commenter, Guest và BSA, bật hoặc tắt từng quyền. Các việc không được bật (sửa lớp, học viên, tài khoản, đăng thông báo, đổi buổi) chỉ Admin làm được. Commenter vẫn đánh dấu chuyên cần. Chọn Guest thì không nhập mật khẩu. BSA chỉ xem, cần mật khẩu, và chỉ mở mục A, F, J, K, L.</p>' +
       rows + (ui.accountForm ? '' : '<button type="button" class="btn btn-primary" data-act="new-account">+ Tạo tài khoản</button>') + form;
   }
 
@@ -9203,7 +9431,7 @@
     var typed = !!(passEl && passEl.getAttribute('data-typed') === '1');
     var password = role !== 'guest' && typed && passEl ? String(passEl.value || '') : '';
     if (!name || !username) { toast('Cần tên và username.'); return; }
-    if (!editing && role !== 'guest' && !password) { toast('Admin và Commenter cần gõ mật khẩu đăng nhập.'); return; }
+    if (!editing && role !== 'guest' && !password) { toast('Admin, Commenter và BSA cần gõ mật khẩu đăng nhập.'); return; }
     var taken = state.accounts.some(function (acc) { return String(acc.username || '').trim() === username && (!editing || acc.id !== editing.id); });
     if (taken) { toast('Username đã được dùng.'); return; }
     if (editing && editing.role === 'admin' && role !== 'admin' && adminCount(editing.id) === 0) {
@@ -9213,7 +9441,7 @@
     var nextPassword = editing ? String(editing.password || '') : '';
     if (role === 'guest') nextPassword = '';
     else if (typed) nextPassword = password;
-    if (role !== 'guest' && !nextPassword) { toast('Admin và Commenter cần mật khẩu.'); return; }
+    if (role !== 'guest' && !nextPassword) { toast('Admin, Commenter và BSA cần mật khẩu.'); return; }
     var perms = null;
     if (role !== 'admin') {
       perms = {
@@ -9298,9 +9526,11 @@
       'drop-image': 1, 'open-soa': 1, 'soa-drop': 1,
       'edit-staff': 1, 'save-staff': 1,
       'people-add': 1, 'people-edit': 1, 'people-save': 1,
+      'class-multi': 1, 'class-bulk-apply': 1, 'class-bulk-clear': 1,
       'code-save': 1, 'care-save': 1, 'profile-save': 1, 'profile-edit': 1, 'photo-url': 1,
       'remark-confirm': 1, 'remark-edit': 1, 'remark-done': 1, 'remark-pick': 1, 'remark-save': 1,
       'remark-revise': 1, 'remark-style': 1, 'remark-revise-close': 1,
+      'remark-select-all': 1, 'remark-assign': 1,
       'detail-care': 1, 'detail-remark': 1, 'detail-remark-pick': 1,
       'dup-transfer': 1, 'dup-skip': 1,
       'book-fold': 1, 'book-set': 1, 'book-message': 1, 'copy-report': 1, 'transfer-report-yes': 1,
@@ -9443,6 +9673,18 @@
       render();
       return;
     }
+    if (act === 'class-multi') {
+      ui.classMulti = !ui.classMulti;
+      if (!ui.classMulti) ui.classPick = {};
+      render();
+      return;
+    }
+    if (act === 'class-bulk-clear') {
+      ui.classPick = {};
+      render();
+      return;
+    }
+    if (act === 'class-bulk-apply') { applyClassBulk(); return; }
     if (act === 'people-add') {
       ui.formError = '';
       ui.modal = { type: 'people-form', key: '' };
@@ -9512,6 +9754,7 @@
       ui.remarkDraft = null;
       ui.remarkEditor = null;
       ui.remarkSlip = '';
+      ui.remarkPick = {};
       ui.screen = 'remarks';
       render();
       return;
@@ -9542,12 +9785,55 @@
       return;
     }
     if (act === 'remark-save') { saveRemarkCard(btn); return; }
+    if (act === 'remark-select-all') {
+      if (deny(canEdit())) return;
+      var clsAll = findClass(ui.remarkClassId);
+      var keyAll = ui.remarkSession || '';
+      if (!clsAll || !keyAll) { toast('Chọn buổi học.'); return; }
+      var anyPick = false;
+      remarkRoster(clsAll, keyAll).forEach(function (stu) {
+        if (!studentInputOpen(clsAll, stu)) return;
+        ui.remarkPick[stu.id] = true;
+        anyPick = true;
+      });
+      if (!anyPick) { toast('Không có thẻ để chọn.'); return; }
+      document.querySelectorAll('[data-remark-pick]').forEach(function (box) {
+        box.checked = !!ui.remarkPick[box.getAttribute('data-remark-pick')];
+      });
+      return;
+    }
+    if (act === 'remark-assign') {
+      if (deny(canEdit())) return;
+      var clsAssign = findClass(ui.remarkClassId);
+      var keyAssign = ui.remarkSession || '';
+      if (!clsAssign || !keyAssign) { toast('Chọn buổi học.'); return; }
+      var assignIds = [];
+      remarkRoster(clsAssign, keyAssign).forEach(function (stu) {
+        if (ui.remarkPick[stu.id] && studentInputOpen(clsAssign, stu)) assignIds.push(stu.id);
+      });
+      if (!assignIds.length) { toast('Chọn ít nhất một thẻ.'); return; }
+      var assignPick = document.getElementById('remark-session-pick');
+      var assignLabel = keyAssign;
+      if (assignPick && assignPick.selectedOptions && assignPick.selectedOptions[0]) assignLabel = assignPick.selectedOptions[0].textContent || assignLabel;
+      ui.remarkEditor = {
+        classId: clsAssign.id,
+        stuId: assignIds.length === 1 ? assignIds[0] : '',
+        stuIds: assignIds,
+        sessionKey: keyAssign,
+        label: assignLabel,
+        tag: 'uncategorized',
+        text: ''
+      };
+      render();
+      return;
+    }
     if (act === 'remark-back') {
       ui.remarkClassId = '';
       ui.remarkOpenClass = '';
       ui.remarkSession = '';
       ui.remarkDraft = null;
       ui.remarkEditor = null;
+      ui.remarkPick = {};
       render();
       return;
     }
@@ -9565,7 +9851,12 @@
     if (act === 'remark-read-back') { ui.remarkReadId = ''; ui.remarkSlip = ''; render(); return; }
     if (act === 'remark-slip') { markRemarkSlip(btn.getAttribute('data-id')); return; }
     if (act === 'nav') {
-      ui.screen = btn.getAttribute('data-screen');
+      var nextScreen = btn.getAttribute('data-screen');
+      if (!screenAllowed(nextScreen)) {
+        toast('Tài khoản BSA chỉ mở mục A, F, J, K và L.');
+        return;
+      }
+      ui.screen = nextScreen;
       ui.modal = null;
       ui.peopleKey = '';
       ui.detailId = null;
@@ -9791,6 +10082,7 @@
     }
     if (act === 'export-schedule') { exportSchedule(btn.getAttribute('data-kind')); return; }
     if (act === 'open-homework') {
+      if (isBsa()) { toast('Tài khoản BSA chỉ mở mục A, F, J, K và L.'); return; }
       ui.classId = btn.getAttribute('data-id');
       ui.screen = 'homework-class';
       ui.hwPick = {};
@@ -9931,6 +10223,7 @@
     if (act === 'past-book-standard') { resetPastBooks(); return; }
     if (act === 'past-book-cancel') { closePastBooks(); render(); return; }
     if (act === 'curriculum-cm') { ui.curriculumCmOpen = !ui.curriculumCmOpen; render(); return; }
+    if (act === 'curriculum-pending') { ui.curriculumPendingOpen = !ui.curriculumPendingOpen; render(); return; }
     if (act === 'bulk-expire') {
       if (!selectedIds().length) return;
       ui.formError = '';
@@ -10314,6 +10607,7 @@
       ui.remarkDraft = null;
       ui.remarkEditor = null;
       ui.remarkSlip = '';
+      ui.remarkPick = {};
       render();
       return;
     }
@@ -10321,6 +10615,7 @@
       ui.remarkSession = t.value || '';
       ui.remarkDraft = null;
       ui.remarkEditor = null;
+      ui.remarkPick = {};
       render();
       return;
     }
@@ -10435,6 +10730,20 @@
       paintNotices();
       return;
     }
+    if (t.matches('[data-class-pick]')) {
+      var classPickId = t.getAttribute('data-class-pick');
+      if (!ui.classPick) ui.classPick = {};
+      if (t.checked) ui.classPick[classPickId] = true;
+      else delete ui.classPick[classPickId];
+      var classBulkCount = document.getElementById('class-bulk-count');
+      if (classBulkCount) classBulkCount.textContent = String(Object.keys(ui.classPick).length);
+      return;
+    }
+    if (t.id === 'people-position') {
+      var peoplePassWrap = document.getElementById('people-pass-wrap');
+      if (peoplePassWrap) peoplePassWrap.hidden = t.value !== 'BSA';
+      return;
+    }
     if (t.id === 'acc-role') {
       var wrap = document.getElementById('acc-pass-wrap');
       if (wrap) wrap.hidden = t.value === 'guest';
@@ -10520,6 +10829,12 @@
       applyCurriculumPatch(t.getAttribute('data-id'), { pecPass: t.value }, false);
       return;
     }
+    if (t.matches('[data-remark-pick]')) {
+      var remarkId = t.getAttribute('data-remark-pick');
+      if (t.checked) ui.remarkPick[remarkId] = true;
+      else delete ui.remarkPick[remarkId];
+      return;
+    }
     if (t.matches('[data-hw-pick]')) {
       if (t.checked) ui.hwPick[t.getAttribute('data-hw-pick')] = true;
       else delete ui.hwPick[t.getAttribute('data-hw-pick')];
@@ -10536,11 +10851,11 @@
   });
 
   document.addEventListener('focusin', function (e) {
-    if (e.target && e.target.id === 'acc-pass') e.target.removeAttribute('readonly');
+    if (e.target && (e.target.id === 'acc-pass' || e.target.id === 'people-pass')) e.target.removeAttribute('readonly');
   });
 
   document.addEventListener('beforeinput', function (e) {
-    if (e.target && e.target.id === 'acc-pass') e.target.setAttribute('data-typed', '1');
+    if (e.target && (e.target.id === 'acc-pass' || e.target.id === 'people-pass')) e.target.setAttribute('data-typed', '1');
   });
 
   document.addEventListener('keydown', function (e) {
@@ -10741,8 +11056,205 @@
     if (e.target.id === 'student-form') { e.preventDefault(); saveStudent(e.target); }
   });
 
+  var fxBuf = '';
+  var fxEsc = 0;
+  var fxEscTimer = null;
+  var fxErrorTimer = null;
+  var fxErrorStarted = 0;
+  var FX_WORDS = ['BACKWARDS', 'DUCK', 'ERROR', 'FALL'];
+  var FX_ERROR_CAP = 64;
+
+  function fxTypingTarget(target) {
+    var el = target || document.activeElement;
+    if (!el || !el.tagName) return false;
+    var tag = String(el.tagName).toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
+    if (el.isContentEditable) return true;
+    if (el.closest && el.closest('[contenteditable="true"]')) return true;
+    return false;
+  }
+
+  function fxActive() {
+    return document.documentElement.getAttribute('data-fx-back') === '1'
+      || document.documentElement.getAttribute('data-fx-fall') === '1'
+      || !!document.getElementById('fx-ducks')
+      || !!document.getElementById('fx-errors')
+      || !!document.getElementById('fx-fall-veil');
+  }
+
+  function fxClearError() {
+    if (fxErrorTimer) {
+      clearInterval(fxErrorTimer);
+      fxErrorTimer = null;
+    }
+    var layer = document.getElementById('fx-errors');
+    if (layer) layer.remove();
+  }
+
+  function fxClearEffects() {
+    document.documentElement.removeAttribute('data-fx-back');
+    document.documentElement.removeAttribute('data-fx-fall');
+    var ducks = document.getElementById('fx-ducks');
+    if (ducks) ducks.remove();
+    var veil = document.getElementById('fx-fall-veil');
+    if (veil) veil.remove();
+    fxClearError();
+    fxBuf = '';
+    fxEsc = 0;
+    if (fxEscTimer) {
+      clearTimeout(fxEscTimer);
+      fxEscTimer = null;
+    }
+  }
+
+  function fxGoMenu() {
+    fxClearEffects();
+    ui.screen = 'menu';
+    ui.modal = null;
+    ui.formError = '';
+    ui.importDraft = null;
+    ui.detailId = null;
+    ui.detailEdit = false;
+    ui.detailMini = '';
+    ui.remarkEditor = null;
+    ui.remarkSlip = '';
+    render();
+  }
+
+  function fxToggleBack() {
+    var root = document.documentElement;
+    if (root.getAttribute('data-fx-back') === '1') root.removeAttribute('data-fx-back');
+    else root.setAttribute('data-fx-back', '1');
+  }
+
+  function fxAddDuck() {
+    var layer = document.getElementById('fx-ducks');
+    if (!layer) {
+      layer = document.createElement('div');
+      layer.id = 'fx-ducks';
+      layer.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(layer);
+    }
+    var n = layer.querySelectorAll('.fx-duck').length;
+    if (n >= 20) {
+      toast('Đã đủ 20 con vịt.');
+      return;
+    }
+    var duck = document.createElement('div');
+    duck.className = 'fx-duck';
+    duck.style.setProperty('--duck-dur', (10 + (n % 7) * 1.3) + 's');
+    duck.style.setProperty('--duck-delay', (-n * 0.7) + 's');
+    duck.innerHTML = '<svg viewBox="0 0 64 40" aria-hidden="true"><ellipse cx="26" cy="26" rx="16" ry="10" fill="#f5c518"/><circle cx="44" cy="16" r="9" fill="#f5c518"/><circle cx="47" cy="14" r="1.7" fill="#111111"/><path d="M51 16 L63 19 L51 22 Z" fill="#f97316"/><path d="M14 32 Q22 40 30 32" fill="none" stroke="#f97316" stroke-width="2"/></svg>';
+    layer.appendChild(duck);
+  }
+
+  function fxErrorCount() {
+    var layer = document.getElementById('fx-errors');
+    return layer ? layer.querySelectorAll('.fx-error').length : 0;
+  }
+
+  function fxSpawnErrors(count) {
+    var layer = document.getElementById('fx-errors');
+    if (!layer) {
+      layer = document.createElement('div');
+      layer.id = 'fx-errors';
+      layer.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(layer);
+    }
+    var room = FX_ERROR_CAP - fxErrorCount();
+    if (room <= 0) return;
+    var add = count > room ? room : count;
+    for (var i = 0; i < add; i++) {
+      var box = document.createElement('div');
+      box.className = 'fx-error';
+      box.setAttribute('role', 'alert');
+      box.innerHTML = '<strong>Error</strong><span>Không xử lý được yêu cầu.</span>';
+      box.style.left = (4 + Math.random() * 68) + '%';
+      box.style.top = (6 + Math.random() * 68) + '%';
+      box.style.transform = 'rotate(' + ((Math.random() * 8) - 4) + 'deg)';
+      layer.appendChild(box);
+    }
+  }
+
+  function fxStartError() {
+    fxClearError();
+    fxErrorStarted = Date.now();
+    fxSpawnErrors(1);
+    var errorLayer = document.getElementById('fx-errors');
+    if (errorLayer) errorLayer.setAttribute('data-until', String(fxErrorStarted + 30000));
+    fxErrorTimer = setInterval(function () {
+      if (Date.now() - fxErrorStarted >= 30000) {
+        fxClearError();
+        return;
+      }
+      var have = fxErrorCount();
+      if (!have || have >= FX_ERROR_CAP) return;
+      fxSpawnErrors(have);
+    }, 3000);
+  }
+
+  function fxToggleFall() {
+    var root = document.documentElement;
+    if (root.getAttribute('data-fx-fall') === '1') {
+      root.removeAttribute('data-fx-fall');
+      var oldVeil = document.getElementById('fx-fall-veil');
+      if (oldVeil) oldVeil.remove();
+      return;
+    }
+    root.setAttribute('data-fx-fall', '1');
+    if (!document.getElementById('fx-fall-veil')) {
+      var veil = document.createElement('div');
+      veil.id = 'fx-fall-veil';
+      veil.className = 'fx-fall-veil';
+      veil.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(veil);
+    }
+  }
+
+  function fxMatchWord() {
+    var found = '';
+    for (var i = 0; i < FX_WORDS.length; i++) {
+      var word = FX_WORDS[i];
+      if (fxBuf.slice(-word.length) === word && word.length > found.length) found = word;
+    }
+    return found;
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (!e || e.key === 'Escape' || e.repeat || e.ctrlKey || e.altKey || e.metaKey) return;
+    if (fxTypingTarget(e.target)) {
+      fxBuf = '';
+      return;
+    }
+    if (!e.shiftKey) {
+      fxBuf = '';
+      return;
+    }
+    var key = String(e.key || '');
+    if (key.length !== 1 || !/^[a-z]$/i.test(key)) return;
+    fxBuf = (fxBuf + key.toUpperCase()).slice(-16);
+    var found = fxMatchWord();
+    if (!found) return;
+    fxBuf = '';
+    if (found === 'BACKWARDS') fxToggleBack();
+    else if (found === 'DUCK') fxAddDuck();
+    else if (found === 'ERROR') fxStartError();
+    else if (found === 'FALL') fxToggleFall();
+  });
+
+  document.addEventListener('keyup', function (e) {
+    if (e && e.key === 'Shift') fxBuf = '';
+  });
+
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
+    if (fxActive()) {
+      fxEsc += 1;
+      if (fxEscTimer) clearTimeout(fxEscTimer);
+      fxEscTimer = setTimeout(function () { fxEsc = 0; }, 2500);
+      if (fxEsc >= 3) fxGoMenu();
+      return;
+    }
     var gateBox = document.getElementById('gatebox');
     if (gateBox && !gateBox.classList.contains('hidden')) return;
     var previewBox = document.getElementById('previewbox');

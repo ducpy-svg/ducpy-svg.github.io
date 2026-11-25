@@ -1147,6 +1147,7 @@ button.hw-mark { cursor: pointer; }
 .hw-miss { background: #ef8a1a; color: #1a1a1a; }
 .hw-absent { background: #fff; color: #111; }
 .hw-applied { background: #67e8f9; color: #042033; }
+.hw-test { background: #f97316; color: #111111; }
 .hw-moved { background: linear-gradient(135deg, #1a73e8 50%, #e2b007 50%); color: #fff; }
 .hw-before, .hw-empty { background: var(--paper2); color: var(--muted); }
 tr.hw-row-unavailable td.hw-slot { opacity: 0.4; }
@@ -1179,6 +1180,20 @@ span.book-issued-paid { background: #b7f0cf; color: #0d3b24; }
 select.book-issued-unpaid,
 option.book-issued-unpaid,
 span.book-issued-unpaid { background: #ffe08a; color: #3d2a00; }
+select.book-closed-unissued,
+option.book-closed-unissued,
+span.book-pick.book-closed-unissued,
+button.book-choice.book-closed-unissued { background: #facc15; color: #3d2a00; }
+select.book-already-have,
+option.book-already-have,
+span.book-pick.book-already-have,
+button.book-choice.book-already-have { background: #e9d5ff; color: #3b0764; }
+button.book-choice.book-already-have,
+select.book-already-have,
+option.book-already-have,
+span.book-pick.book-already-have,
+.book-have-mark,
+.book-price.is-have { text-decoration: line-through; text-decoration-thickness: 2px; }
 .price-board, .book-stats { margin: 14px 0; }
 .book-stats-table { min-width: 280px; }
 .book-stats-hit {
@@ -1197,6 +1212,8 @@ td.book-slot { min-width: 148px; vertical-align: top; text-align: left; }
 td.book-slot.book-not-bought { background: #ffb3be; color: #6a040f; }
 td.book-slot.book-issued-paid { background: #b7f0cf; color: #0d3b24; }
 td.book-slot.book-issued-unpaid { background: #ffe08a; color: #3d2a00; }
+td.book-slot.book-closed-unissued { background: #facc15; color: #3d2a00; }
+td.book-slot.book-already-have { background: #e9d5ff; color: #3b0764; }
 td.book-slot.book-slot-empty { background: transparent; }
 .book-slot-head { display: flex; justify-content: space-between; gap: 6px; align-items: flex-start; }
 .book-arrow {
@@ -1233,9 +1250,14 @@ html[data-skin] td.book-prices { background: #f8fafc; }
 html[data-skin] .book-price { color: #4b5563; }
 html[data-skin] .book-price.is-paid { color: #1d4ed8; }
 html[data-skin] .book-price.is-unpaid { color: #d90429; }
+html[data-skin] .book-price.is-have { color: #1d4ed8; text-decoration: line-through; text-decoration-thickness: 2px; }
 html[data-skin] td.book-slot.book-not-bought { background: #ffb3be; color: #6a040f; }
 html[data-skin] td.book-slot.book-issued-paid { background: #b7f0cf; color: #0d3b24; }
 html[data-skin] td.book-slot.book-issued-unpaid { background: #ffe08a; color: #3d2a00; }
+html[data-skin] td.book-slot.book-closed-unissued { background: #facc15; background-image: none; color: #3d2a00; }
+html[data-skin] td.book-slot.book-already-have { background: #e9d5ff; background-image: none; color: #3b0764; }
+html[data-skin] button.book-choice.book-closed-unissued { background: #facc15; background-image: none; color: #3d2a00; }
+html[data-skin] button.book-choice.book-already-have { background: #e9d5ff; background-image: none; color: #3b0764; text-decoration: line-through; text-decoration-thickness: 2px; }
 .report-text {
   width: 100%;
   min-height: 240px;
@@ -3845,6 +3867,7 @@ html[data-skin="classic"] .band-noon td {
 .remark-card.tag-issue { background: #fef3c7; color: #713f12; }
 .remark-card.tag-incomplete { background: #fecdd3; color: #9f1239; }
 .remark-card.tag-absent { background: #e5e7eb; color: #1f2937; }
+.remark-card.tag-test { background: #ffedd5; color: #9a3412; }
 .remark-card.tag-uncategorized,
 .remark-card.tag-plain { background: #ffffff; color: #111111; }
 .remark-chip.tag-finished,
@@ -3857,6 +3880,8 @@ html[data-skin="classic"] .band-noon td {
 .remark-pill.tag-incomplete { background: #b91c1c; color: #ffffff; }
 .remark-chip.tag-absent,
 .remark-pill.tag-absent { background: #4b5563; color: #f8fafc; }
+.remark-chip.tag-test,
+.remark-pill.tag-test { background: #f97316; color: #111111; }
 .remark-chip.tag-uncategorized,
 .remark-pill.tag-uncategorized { background: #ffffff; color: #111111; }
 html[data-skin] .remark-chip.tag-finished,
@@ -3869,6 +3894,8 @@ html[data-skin] .remark-chip.tag-incomplete,
 html[data-skin] .remark-pill.tag-incomplete { background: #b91c1c; color: #ffffff; background-image: none; }
 html[data-skin] .remark-chip.tag-absent,
 html[data-skin] .remark-pill.tag-absent { background: #4b5563; color: #f8fafc; background-image: none; }
+html[data-skin] .remark-chip.tag-test,
+html[data-skin] .remark-pill.tag-test { background: #f97316; color: #111111; background-image: none; }
 html[data-skin] .remark-chip.tag-uncategorized,
 html[data-skin] .remark-pill.tag-uncategorized { background: #ffffff; color: #111111; background-image: none; }
 
@@ -4051,5 +4078,108 @@ html[data-skin] button.remark-under,
 html[data-theme="night"] button.remark-under { text-decoration: underline; }
 .detail-mini { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
 .detail-mini .field { flex: 1 1 100%; margin: 0; }
+.remark-pick { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; font-weight: 800; }
+.remark-bulk-row { margin: 8px 0; }
+html[data-fx-back="1"] body { transform: scaleX(-1); transform-origin: top center; }
+.fx-duck {
+  position: fixed;
+  z-index: 60;
+  width: 72px;
+  height: 46px;
+  pointer-events: none;
+  left: 0;
+  top: 0;
+  animation: fx-duck-run var(--duck-dur, 14s) linear infinite;
+  animation-delay: var(--duck-delay, 0s);
+}
+.fx-duck svg { display: block; width: 100%; height: 100%; }
+@keyframes fx-duck-run {
+  0% { transform: translate(4vw, 74vh) scaleX(1); }
+  24% { transform: translate(86vw, 74vh) scaleX(1); }
+  25% { transform: translate(86vw, 74vh) scaleX(1); }
+  49% { transform: translate(86vw, 8vh) scaleX(-1); }
+  50% { transform: translate(86vw, 8vh) scaleX(-1); }
+  74% { transform: translate(4vw, 8vh) scaleX(-1); }
+  75% { transform: translate(4vw, 8vh) scaleX(-1); }
+  99% { transform: translate(4vw, 74vh) scaleX(1); }
+  100% { transform: translate(4vw, 74vh) scaleX(1); }
+}
+.fx-error {
+  position: fixed;
+  z-index: 70;
+  pointer-events: none;
+  width: 220px;
+  padding: 10px 12px;
+  border: 3px solid #7f1d1d;
+  background: #fee2e2;
+  color: #7f1d1d;
+  font-weight: 800;
+  box-shadow: 6px 6px 0 #111111;
+}
+.fx-error strong { display: block; font-size: 16px; }
+.fx-fall-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  pointer-events: none;
+  background: repeating-linear-gradient(to bottom, rgba(255, 0, 80, 0.14) 0 2px, rgba(0, 0, 0, 0) 2px 5px);
+  animation: fx-veil 0.22s steps(2) infinite;
+  mix-blend-mode: multiply;
+}
+@keyframes fx-veil {
+  0% { transform: translate(0, 0); opacity: 0.9; }
+  50% { transform: translate(-4px, 2px); opacity: 0.45; }
+  100% { transform: translate(4px, -2px); opacity: 0.85; }
+}
+html[data-fx-fall="1"] #app button,
+html[data-fx-fall="1"] #app .menu-card,
+html[data-fx-fall="1"] #app h1,
+html[data-fx-fall="1"] #app h2,
+html[data-fx-fall="1"] #app h3,
+html[data-fx-fall="1"] #app p,
+html[data-fx-fall="1"] #app li,
+html[data-fx-fall="1"] #app td,
+html[data-fx-fall="1"] #app th,
+html[data-fx-fall="1"] #app label,
+html[data-fx-fall="1"] #app summary,
+html[data-fx-fall="1"] #app .folder,
+html[data-fx-fall="1"] #app .remark-card,
+html[data-fx-fall="1"] #app input,
+html[data-fx-fall="1"] #app select,
+html[data-fx-fall="1"] #app textarea {
+  animation: fx-rubble 0.42s steps(2) infinite;
+  text-shadow: 2px 0 #ff2d55, -2px 0 #22d3ee;
+}
+html[data-fx-fall="1"] #app button:nth-child(2n),
+html[data-fx-fall="1"] #app .menu-card:nth-child(2n),
+html[data-fx-fall="1"] #app p:nth-child(2n) {
+  animation-duration: 0.66s;
+  animation-direction: reverse;
+}
+@keyframes fx-rubble {
+  0% { transform: translate(0, 0) skewX(0deg); }
+  25% { transform: translate(-8px, 6px) skewX(-9deg) rotate(-1deg); }
+  50% { transform: translate(7px, -5px) skewX(12deg); }
+  75% { transform: translate(-4px, 9px) skewX(-14deg) rotate(1deg); }
+  100% { transform: translate(5px, 2px) skewX(7deg); }
+}
+.class-pick {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--ink);
+}
+.class-bulk-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+}
+.class-bulk-fields .field { flex: 1 1 180px; margin: 0; }
+.hello.role-bsa { background: #0f766e; color: #fff; border-color: #134e4a; }
+.hello.role-bsa .role { color: #fff; }
+.role-pill.role-bsa { background: #0f766e; color: #fff; }
 [data-scroll-keep] { overflow-anchor: none; scrollbar-gutter: stable; }
 
