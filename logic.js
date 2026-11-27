@@ -588,7 +588,7 @@
       name: newName
     });
     cls.codeHold = true;
-    pushNotice(state, announcedAt, formatDMY(at) + ': ' + oldName + ' đã lên thành ' + newName + '. Cập nhật mã lớp trước khi vào sổ tay.');
+    pushNotice(state, announcedAt, formatDMY(at) + ': ' + oldName + ' đã lên thành ' + newName + '. Cập nhật mã lớp mới để mở khóa thư mục.');
     return { oldName: oldName, newName: newName, at: when, done: false };
   }
 
@@ -840,10 +840,14 @@
     var when = now instanceof Date ? now : new Date(now);
     if (!stu) return { kind: 'listed', tag: 'official', reason: '', expiredAt: null, until: null };
     if (stu.expireKind === 'stop' || (stu.status === 'stopped' && stu.expireKind !== 'outdated')) {
-      var goneAt = new Date(stu.expiredAt || stu.stoppedAt || when);
-      if (isNaN(goneAt.getTime())) goneAt = when;
-      var goneReason = stu.expireReason || 'Dừng học';
-      return { kind: 'archive', tag: 'stop', reason: goneReason, expiredAt: goneAt, until: goneAt };
+      var holdAt = new Date(stu.stoppedAt || stu.expiredAt || when);
+      if (isNaN(holdAt.getTime())) holdAt = when;
+      var holdUntil = addDays(holdAt, 7);
+      var holdReason = stu.expireReason || 'Dừng học';
+      if (when.getTime() >= holdUntil.getTime()) {
+        return { kind: 'archive', tag: 'stop', reason: holdReason, expiredAt: holdAt, until: holdUntil };
+      }
+      return { kind: 'gray', tag: 'stop', reason: holdReason, expiredAt: holdAt, until: holdUntil };
     }
     if (stu.expireKind === 'outdated' && stu.expiredAt) {
       var stopAt = new Date(stu.expiredAt);
@@ -1841,24 +1845,94 @@
     return face || currentName(cls);
   }
 
-  function transferReport(fromCls, toCls, students, when) {
-    var date = formatDMY(when);
-    var fromLine = classFace(fromCls) + ' ' + currentName(fromCls);
-    var toLine = classFace(toCls) + ' ' + currentName(toCls);
-    var fromSched = scheduleText(fromCls);
-    var toSched = scheduleText(toCls);
-    return (students || []).map(function (stu) {
-      return [
-        'CN Phúc Yên đề xuất chuyển lớp học viên:',
-        '- Tên học viên: ' + String(stu && stu.name || ''),
-        '- Mã học viên: ' + String(stu && stu.code || ''),
-        '- Lớp hiện tại: ' + fromLine,
-        '- Lịch học: ' + fromSched,
-        'Chuyển sang lớp mới: ' + toLine,
-        '- Lịch học lớp mới: ' + toSched,
-        '- Bắt đầu từ ngày: ' + date
-      ].join('\n');
-    }).join('\n\n');
+  function sessionDateText(ses) {
+    if (!ses || !ses.date) return '';
+    var day = DAYS.filter(function (item) { return item.dow === ses.dow; })[0];
+    return formatDMY(ses.date) + (day ? ' ' + day.short : '') + ' ' + formatTimeValue(ses.start) + '–' + formatTimeValue(ses.end);
+  }
+
+  function nextClassSession(cls, now) {
+    var when = now instanceof Date ? new Date(now.getTime()) : new Date(now || Date.now());
+    if (isNaN(when.getTime())) when = new Date();
+    if (!cls) return null;
+    var sessions = lessonSessions(cls, lessonTotal(cls.gradeId));
+    var i;
+    for (i = 0; i < sessions.length; i++) {
+      if (sessions[i].date.getTime() >= when.getTime()) return sessions[i];
+    }
+    var skips = sessionSkipMap(cls);
+    var start = startOfDay(when);
+    for (var d = 0; d < 60; d++) {
+      var day = addDays(start, d);
+      var hits = [];
+      slotsOn(cls, day).forEach(function (slot) {
+        if (day.getDay() !== Number(slot.dow)) return;
+        var ses = occurrenceAt(day, slot);
+        if (skips[ses.key]) return;
+        if (ses.date.getTime() < when.getTime()) return;
+        hits.push(ses);
+      });
+      (cls.sessionChanges || []).forEach(function (change) {
+        if (!change || change.action !== 'custom') return;
+        var custom = customOccurrence(change);
+        if (!custom || custom.iso !== isoDay(day)) return;
+        if (skips[custom.key] && skips[custom.key] !== change) return;
+        if (custom.date.getTime() < when.getTime()) return;
+        hits.push(custom);
+      });
+      hits.sort(function (a, b) { return a.date - b.date; });
+      if (hits.length) return hits[0];
+    }
+    return null;
+  }
+
+  function activeSessions(cls, now) {
+    var when = now instanceof Date ? new Date(now.getTime()) : new Date(now || Date.now());
+    if (isNaN(when.getTime()) || !cls) return [];
+    var day = startOfDay(when);
+    var hits = [];
+    slotsOn(cls, day).forEach(function (slot) {
+      if (!slot || day.getDay() !== Number(slot.dow)) return;
+      var ses = occurrenceAt(day, slot);
+      if (ses.date.getTime() <= when.getTime() && when.getTime() < ses.endDate.getTime()) hits.push(ses);
+    });
+    hits.sort(function (a, b) { return a.date - b.date; });
+    return hits;
+  }
+
+  function penguinRate(items, now) {
+    var when = now instanceof Date ? now : new Date(now || Date.now());
+    var scored = 0;
+    var done = 0;
+    (items || []).forEach(function (item) {
+      if (!item) return;
+      var finished = !!item.done;
+      var end = new Date(item.end || 0);
+      var expired = !isNaN(end.getTime()) && when.getTime() > end.getTime();
+      if (!finished && !expired) return;
+      scored += 1;
+      if (finished) done += 1;
+    });
+    if (!scored) return 100;
+    return Math.round(done / scored * 100);
+  }
+
+  function transferReport(toCls, students, dateText) {
+    var className = currentName(toCls);
+    var code = toCls && toCls.classCode != null ? String(toCls.classCode).trim() : '';
+    var sched = scheduleText(toCls);
+    var lines = ['CN Phúc Yên đề xuất chuyển lớp cho học viên:', ''];
+    (students || []).forEach(function (stu, index) {
+      if (index) lines.push('');
+      lines.push((index + 1) + '. Học viên: ' + String(stu && stu.name || ''));
+      lines.push('Mã học viên: ' + String(stu && stu.code || ''));
+      lines.push('');
+      lines.push('Chuyển sang lớp mới: ' + className);
+      lines.push('- Mã lớp: ' + code);
+      lines.push('- Lịch học: ' + sched);
+      lines.push('Ngày chuyển lớp: ' + String(dateText || ''));
+    });
+    return lines.join('\n');
   }
 
   function feeReport(students, books, when) {
@@ -3849,6 +3923,10 @@
     curriculumMonthStats: curriculumMonthStats,
     curriculumFresh: curriculumFresh,
     classFace: classFace,
+    sessionDateText: sessionDateText,
+    nextClassSession: nextClassSession,
+    activeSessions: activeSessions,
+    penguinRate: penguinRate,
     transferReport: transferReport,
     feeReport: feeReport,
     pecReady: pecReady,

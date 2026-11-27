@@ -4181,5 +4181,112 @@ html[data-fx-fall="1"] #app p:nth-child(2n) {
 .hello.role-bsa { background: #0f766e; color: #fff; border-color: #134e4a; }
 .hello.role-bsa .role { color: #fff; }
 .role-pill.role-bsa { background: #0f766e; color: #fff; }
+.lock-flag {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 1px 6px;
+  background: #111111;
+  color: #ffffff;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.folder.is-locked,
+.class-open.is-locked,
+.tt-card.is-locked {
+  outline: 3px dashed #f59e0b;
+  outline-offset: -6px;
+}
+.save-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.save-data-wrap { display: flex; flex-direction: column; align-items: flex-start; max-width: 280px; }
+.save-data-wrap .help { margin: 0; font-size: 12px; font-weight: 700; }
+#save-data:disabled {
+  background: #b91c1c;
+  color: #ffffff;
+  border-color: #7f1d1d;
+  cursor: not-allowed;
+  opacity: 1;
+}
+.penguin-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 3px solid #111111;
+  font-weight: 800;
+  cursor: pointer;
+}
+.penguin-switch.is-on { background: #15803d; color: #ffffff; }
+.penguin-switch.is-off { background: #b91c1c; color: #ffffff; }
+.penguin-switch input { width: 18px; height: 18px; }
+.penguin-snow-ico { font-size: 22px; line-height: 1; }
+#penguin-layer { position: fixed; inset: 0; z-index: 18; pointer-events: none; }
+.penguin { position: absolute; width: 84px; pointer-events: auto; }
+.penguin-bubble {
+  position: absolute;
+  bottom: 72px;
+  left: 50%;
+  width: 220px;
+  transform: translateX(-50%);
+  background: #ffffff;
+  color: #111111;
+  border: 3px solid #111111;
+  padding: 8px;
+  font-weight: 800;
+  font-size: 13px;
+  line-height: 1.35;
+  box-shadow: 4px 4px 0 #111111;
+}
+.penguin-bubble:empty { display: none; }
+.penguin-bubble .btn { margin: 4px 4px 0 0; }
+.penguin-bob { animation: penguin-bob 0.45s steps(2) infinite; }
+.penguin-face { width: 64px; height: 64px; }
+.penguin.face-left .penguin-face { transform: scaleX(-1); }
+.penguin-sprite { width: 64px; height: 64px; display: block; }
+@keyframes penguin-bob {
+  50% { transform: translateY(-4px); }
+}
+.penguin-rate {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  pointer-events: none;
+  background: #111111;
+  color: #ffffff;
+  padding: 8px 10px;
+  font-weight: 800;
+  border: 3px solid #ffffff;
+}
+.penguin-flakes { position: absolute; inset: 0; overflow: hidden; }
+.penguin-flakes i {
+  position: absolute;
+  top: -16px;
+  color: #e0f2fe;
+  font-style: normal;
+  font-size: 16px;
+  animation: penguin-flake 7s linear infinite;
+}
+@keyframes penguin-flake { to { transform: translateY(100vh); } }
+.penguin-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 19;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(4, 16, 28, 0.45);
+  pointer-events: auto;
+}
+.penguin-card {
+  width: min(440px, 100%);
+  max-height: min(88vh, 860px);
+  overflow: auto;
+  background: #ffffff;
+  color: #111111;
+  border: 4px solid #111111;
+  padding: 16px;
+  box-shadow: 8px 8px 0 #111111;
+}
+.penguin-card .remark-composer { min-height: 72px; }
 [data-scroll-keep] { overflow-anchor: none; scrollbar-gutter: stable; }
 
